@@ -235,7 +235,7 @@ router.post('/execute/:id', authenticateToken, async (req, res) => {
 // Execute all test cases
 router.post('/execute-all', authenticateToken, async (req, res) => {
     try {
-        const { browserType = 'chromium', headless = true } = req.body;
+        const { browserType = 'chromium', headless = true, parallel = false, maxConcurrency = 3 } = req.body;
         const db = getDatabase();
 
         // Get all test cases for the user
@@ -255,63 +255,112 @@ router.post('/execute-all', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'No test cases found' });
         }
 
-        const testService = new PlaywrightTestService();
         const results = [];
 
-        try {
-            await testService.initialize(browserType, headless);
+        if (parallel && testCases.length > 1) {
+            // Parallel execution
+            const executeTestBatch = async (testCaseBatch) => {
+                const testService = new PlaywrightTestService();
+                const batchResults = [];
+                
+                try {
+                    await testService.initialize(browserType, headless);
+                    
+                    for (const testCase of testCaseBatch) {
+                        testCase.actions = JSON.parse(testCase.actions || '[]');
+                        const result = await testService.runTest(testCase);
 
-            for (const testCase of testCases) {
-                testCase.actions = JSON.parse(testCase.actions || '[]');
-                const result = await testService.runTest(testCase);
+                        // Save test result
+                        await new Promise((resolve, reject) => {
+                            db.run(
+                                'INSERT INTO test_results (test_case_id, status, execution_time, error_message, screenshot_path) VALUES (?, ?, ?, ?, ?)',
+                                [testCase.id, result.status, result.executionTime, result.errorMessage, result.screenshotPath],
+                                function(err) {
+                                    if (err) reject(err);
+                                    else resolve(this.lastID);
+                                }
+                            );
+                        });
 
-                // Save test result
-                await new Promise((resolve, reject) => {
-                    db.run(
-                        'INSERT INTO test_results (test_case_id, status, execution_time, error_message, screenshot_path) VALUES (?, ?, ?, ?, ?)',
-                        [testCase.id, result.status, result.executionTime, result.errorMessage, result.screenshotPath],
-                        function(err) {
-                            if (err) reject(err);
-                            else resolve(this.lastID);
-                        }
-                    );
-                });
+                        batchResults.push({
+                            testCaseId: testCase.id,
+                            testCaseName: testCase.name,
+                            ...result
+                        });
+                    }
+                } finally {
+                    await testService.close();
+                }
+                
+                return batchResults;
+            };
 
-                results.push({
-                    testCaseId: testCase.id,
-                    testCaseName: testCase.name,
-                    ...result
-                });
+            // Split test cases into batches for parallel execution
+            const batches = [];
+            for (let i = 0; i < testCases.length; i += maxConcurrency) {
+                batches.push(testCases.slice(i, i + maxConcurrency));
             }
 
-            await testService.close();
-            db.close();
-
-            res.json({
-                message: 'All tests executed successfully',
-                results,
-                summary: {
-                    total: results.length,
-                    passed: results.filter(r => r.status === 'success').length,
-                    failed: results.filter(r => r.status === 'failed').length
-                }
-            });
-
-        } catch (testError) {
-            await testService.close();
-            db.close();
+            // Execute batches in parallel
+            const batchPromises = batches.map(batch => executeTestBatch(batch));
+            const batchResults = await Promise.all(batchPromises);
             
-            console.error('Batch test execution error:', testError);
-            res.status(500).json({ 
-                error: 'Batch test execution failed',
-                details: testError.message,
-                partialResults: results
-            });
+            // Flatten results
+            results.push(...batchResults.flat());
+            
+        } else {
+            // Sequential execution (original implementation)
+            const testService = new PlaywrightTestService();
+            
+            try {
+                await testService.initialize(browserType, headless);
+
+                for (const testCase of testCases) {
+                    testCase.actions = JSON.parse(testCase.actions || '[]');
+                    const result = await testService.runTest(testCase);
+
+                    // Save test result
+                    await new Promise((resolve, reject) => {
+                        db.run(
+                            'INSERT INTO test_results (test_case_id, status, execution_time, error_message, screenshot_path) VALUES (?, ?, ?, ?, ?)',
+                            [testCase.id, result.status, result.executionTime, result.errorMessage, result.screenshotPath],
+                            function(err) {
+                                if (err) reject(err);
+                                else resolve(this.lastID);
+                            }
+                        );
+                    });
+
+                    results.push({
+                        testCaseId: testCase.id,
+                        testCaseName: testCase.name,
+                        ...result
+                    });
+                }
+            } finally {
+                await testService.close();
+            }
         }
+
+        db.close();
+
+        res.json({
+            message: 'All tests executed successfully',
+            executionMode: parallel ? 'parallel' : 'sequential',
+            results,
+            summary: {
+                total: results.length,
+                passed: results.filter(r => r.status === 'success').length,
+                failed: results.filter(r => r.status === 'failed').length
+            }
+        });
 
     } catch (error) {
         console.error('Execute all tests error:', error);
-        res.status(500).json({ error: 'Server error' });
+        res.status(500).json({ 
+            error: 'Batch test execution failed',
+            details: error.message 
+        });
     }
 });
 

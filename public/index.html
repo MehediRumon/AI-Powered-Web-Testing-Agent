@@ -374,6 +374,20 @@
                                 <input type="checkbox" id="headlessMode" checked> Headless Mode
                             </label>
                         </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="parallelExecution"> Parallel Execution
+                            </label>
+                        </div>
+                        <div class="form-group" id="maxConcurrencyGroup" style="display: none;">
+                            <label for="maxConcurrency">Max Concurrent Tests</label>
+                            <select id="maxConcurrency">
+                                <option value="2">2</option>
+                                <option value="3" selected>3</option>
+                                <option value="4">4</option>
+                                <option value="5">5</option>
+                            </select>
+                        </div>
                         <button onclick="executeAllTests()" class="btn-success">Run All Tests</button>
                         <button onclick="loadTestCases()" class="btn-secondary">Refresh Test Cases</button>
                     </div>
@@ -743,22 +757,41 @@
             }
         }
 
+        // Show/hide parallel execution options
+        document.getElementById('parallelExecution').addEventListener('change', function() {
+            const maxConcurrencyGroup = document.getElementById('maxConcurrencyGroup');
+            if (this.checked) {
+                maxConcurrencyGroup.style.display = 'block';
+            } else {
+                maxConcurrencyGroup.style.display = 'none';
+            }
+        });
+
         async function executeAllTests() {
             const browserType = document.getElementById('browserType').value;
             const headless = document.getElementById('headlessMode').checked;
+            const parallel = document.getElementById('parallelExecution').checked;
+            const maxConcurrency = parseInt(document.getElementById('maxConcurrency').value);
 
             try {
-                showStatus('Executing all tests...', 'info');
+                const executionMode = parallel ? 'parallel' : 'sequential';
+                showStatus(`Executing all tests in ${executionMode} mode...`, 'info');
                 
                 const response = await apiCall('/api/test/execute-all', {
                     method: 'POST',
-                    body: JSON.stringify({ browserType, headless })
+                    body: JSON.stringify({ 
+                        browserType, 
+                        headless, 
+                        parallel, 
+                        maxConcurrency 
+                    })
                 });
 
                 const result = await response.json();
                 
                 if (response.ok) {
-                    showStatus(`Batch execution completed: ${result.summary.passed}/${result.summary.total} passed`, 'success');
+                    const mode = result.executionMode || 'sequential';
+                    showStatus(`${mode.charAt(0).toUpperCase() + mode.slice(1)} execution completed: ${result.summary.passed}/${result.summary.total} passed`, 'success');
                     loadTestResults();
                 } else {
                     showStatus(result.error, 'error');
