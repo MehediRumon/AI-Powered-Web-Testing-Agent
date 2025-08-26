@@ -9,7 +9,12 @@
     "test": "node tests/test.js",
     "install-browsers": "npx playwright install"
   },
-  "keywords": ["web-testing", "playwright", "ai", "automation"],
+  "keywords": [
+    "web-testing",
+    "playwright",
+    "ai",
+    "automation"
+  ],
   "author": "",
   "license": "ISC",
   "dependencies": {
@@ -21,6 +26,7 @@
     "jsonwebtoken": "^9.0.2",
     "jspdf": "^3.0.1",
     "multer": "^2.0.2",
+    "node-fetch": "^3.3.2",
     "playwright": "^1.55.0",
     "sqlite3": "^5.1.7",
     "xlsx": "^0.18.5"

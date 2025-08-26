@@ -3,6 +3,7 @@ const { getDatabase } = require('../database/init');
 const { authenticateToken } = require('../middleware/auth');
 const PlaywrightTestService = require('../services/playwright');
 const OpenAIService = require('../services/openai');
+const sampleTests = require('../utils/sampleTests');
 
 const router = express.Router();
 
@@ -42,11 +43,11 @@ function validateActions(actions) {
             throw new Error(`Invalid action type: ${action.type}`);
         }
         
-        // Sanitize string fields
+        // Sanitize string fields (preserve quotes in selectors for CSS)
         const sanitized = {
             type: action.type,
-            locator: action.locator ? action.locator.replace(/[<>'"]/g, '') : undefined,
-            selector: action.selector ? action.selector.replace(/[<>'"]/g, '') : undefined,
+            locator: action.locator ? action.locator.replace(/[<>]/g, '') : undefined,
+            selector: action.selector ? action.selector.replace(/[<>]/g, '') : undefined,
             value: action.value ? action.value.replace(/[<>]/g, '') : undefined,
             description: action.description ? action.description.replace(/[<>]/g, '') : undefined,
             expectedUrl: action.expectedUrl ? action.expectedUrl.replace(/[<>'"]/g, '') : undefined
@@ -778,6 +779,83 @@ router.post('/ai/generate-from-url', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('AI generation error:', error);
         res.status(500).json({ error: 'Failed to generate test case' });
+    }
+});
+
+// Create sample test case - specifically for UMS login scenario
+router.post('/sample/ums-login', authenticateToken, (req, res) => {
+    try {
+        const { password } = req.body;
+        
+        if (!password) {
+            return res.status(400).json({ error: 'Password is required for the test case' });
+        }
+
+        // Get the UMS login sample test and customize it
+        const sampleTest = JSON.parse(JSON.stringify(sampleTests.umsLogin)); // Deep copy
+        
+        // Update the password value in the actions
+        const passwordAction = sampleTest.actions.find(action => 
+            action.description.includes('password') || action.description.includes('Password')
+        );
+        if (passwordAction) {
+            passwordAction.value = password;
+        }
+
+        // Validate and sanitize
+        const sanitizedName = sampleTest.name.trim().replace(/[<>'"]/g, '');
+        const sanitizedDescription = sampleTest.description.trim().replace(/[<>]/g, '');
+        const sanitizedUrl = validateAndSanitizeUrl(sampleTest.url);
+        const validatedActions = validateActions(sampleTest.actions);
+
+        const db = getDatabase();
+
+        db.run(
+            'INSERT INTO test_cases (name, description, url, actions, user_id) VALUES (?, ?, ?, ?, ?)',
+            [sanitizedName, sanitizedDescription, sanitizedUrl, JSON.stringify(validatedActions), req.user.id],
+            function(err) {
+                db.close();
+                
+                if (err) {
+                    console.error('Database error:', err);
+                    return res.status(500).json({ error: 'Failed to create sample test case' });
+                }
+
+                res.status(201).json({
+                    message: 'UMS Login sample test case created successfully',
+                    testCase: {
+                        id: this.lastID,
+                        name: sanitizedName,
+                        description: sanitizedDescription,
+                        url: sanitizedUrl,
+                        actions: validatedActions
+                    }
+                });
+            }
+        );
+    } catch (error) {
+        console.error('Sample test creation error:', error);
+        res.status(500).json({ error: 'Failed to create sample test case' });
+    }
+});
+
+// Get available sample tests
+router.get('/samples', authenticateToken, (req, res) => {
+    try {
+        const samples = Object.keys(sampleTests).map(key => ({
+            key,
+            name: sampleTests[key].name,
+            description: sampleTests[key].description,
+            url: sampleTests[key].url
+        }));
+
+        res.json({
+            message: 'Available sample test cases',
+            samples
+        });
+    } catch (error) {
+        console.error('Get samples error:', error);
+        res.status(500).json({ error: 'Failed to get sample test cases' });
     }
 });
 
