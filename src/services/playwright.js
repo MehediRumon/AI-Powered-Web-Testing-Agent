@@ -96,8 +96,10 @@ class PlaywrightTestService {
             }
 
             const screenshotPath = path.join(screenshotDir, `test-${testCase.id || Date.now()}-${Date.now()}.png`);
-            await this.page.screenshot({ path: screenshotPath, fullPage: true });
-            result.screenshotPath = screenshotPath;
+            if (this.isPageAvailable()) {
+                await this.page.screenshot({ path: screenshotPath, fullPage: true });
+                result.screenshotPath = screenshotPath;
+            }
 
             result.executionTime = Date.now() - startTime;
             
@@ -109,13 +111,15 @@ class PlaywrightTestService {
 
             // Take screenshot on failure
             try {
-                const screenshotDir = path.join(process.cwd(), 'reports', 'screenshots');
-                if (!fs.existsSync(screenshotDir)) {
-                    fs.mkdirSync(screenshotDir, { recursive: true });
+                if (this.isPageAvailable()) {
+                    const screenshotDir = path.join(process.cwd(), 'reports', 'screenshots');
+                    if (!fs.existsSync(screenshotDir)) {
+                        fs.mkdirSync(screenshotDir, { recursive: true });
+                    }
+                    const screenshotPath = path.join(screenshotDir, `error-${testCase.id || Date.now()}-${Date.now()}.png`);
+                    await this.page.screenshot({ path: screenshotPath, fullPage: true });
+                    result.screenshotPath = screenshotPath;
                 }
-                const screenshotPath = path.join(screenshotDir, `error-${testCase.id || Date.now()}-${Date.now()}.png`);
-                await this.page.screenshot({ path: screenshotPath, fullPage: true });
-                result.screenshotPath = screenshotPath;
             } catch (screenshotError) {
                 console.error('Failed to take error screenshot:', screenshotError);
             }
@@ -126,6 +130,11 @@ class PlaywrightTestService {
 
     async executeAction(action) {
         const { type, selector, locator, value, options = {}, expectedUrl } = action;
+        
+        // Check if page is still available before executing action
+        if (!this.isPageAvailable()) {
+            throw new Error('Page, context or browser has been closed');
+        }
         
         // Support both 'selector' and 'locator' for compatibility
         const elementSelector = locator || selector;
@@ -191,9 +200,18 @@ class PlaywrightTestService {
         }
     }
 
+    // Helper method to check if browser/page/context are still available
+    isPageAvailable() {
+        try {
+            return this.page && !this.page.isClosed() && this.context && this.browser && this.browser.isConnected();
+        } catch (error) {
+            return false;
+        }
+    }
+
     async close() {
         try {
-            if (this.page) {
+            if (this.page && !this.page.isClosed()) {
                 await this.page.close();
                 this.page = null;
             }
@@ -201,7 +219,7 @@ class PlaywrightTestService {
                 await this.context.close();
                 this.context = null;
             }
-            if (this.browser) {
+            if (this.browser && this.browser.isConnected()) {
                 await this.browser.close();
                 this.browser = null;
             }
@@ -215,6 +233,15 @@ class PlaywrightTestService {
         const targetPage = page || this.page;
         if (!targetPage) {
             throw new Error('No page available for element detection');
+        }
+
+        // Check if the target page is still available
+        try {
+            if (targetPage.isClosed()) {
+                throw new Error('Page has been closed');
+            }
+        } catch (error) {
+            throw new Error('Page is not available for element detection');
         }
 
         try {
