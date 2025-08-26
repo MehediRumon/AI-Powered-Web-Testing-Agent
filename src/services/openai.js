@@ -110,93 +110,149 @@ Example output:
     }
 
     fallbackParse(instructions) {
-        // Simple rule-based parsing as fallback
-        const lines = instructions.split('\n').filter(line => line.trim());
+        // Enhanced rule-based parsing as fallback
         const actions = [];
         
-        let testName = 'AI Parsed Test';
+        let testName = 'UMS Login and Teacher Management Test';
         let testUrl = '';
-        let testDescription = '';
+        let testDescription = instructions.substring(0, 200) + '...';
 
-        for (const line of lines) {
-            const lowerLine = line.toLowerCase().trim();
+        // Extract URL from anywhere in the instructions
+        const urlMatch = instructions.match(/https?:\/\/[^\s\.]+(?:\.[^\s\.]*)*(?:\/[^\s]*)?/);
+        if (urlMatch) {
+            testUrl = urlMatch[0].replace(/\.$/, ''); // Remove trailing period
+        }
+
+        // Split instructions by sentence endings or periods, then filter and process
+        const sentences = instructions.split(/[\.!]\s+/)
+            .map(s => s.trim())
+            .filter(s => s.length > 0);
+
+        for (const sentence of sentences) {
+            const lowerSentence = sentence.toLowerCase().trim();
             
-            // Extract URL
-            const urlMatch = line.match(/https?:\/\/[^\s]+/);
-            if (urlMatch) {
-                testUrl = urlMatch[0];
+            // Skip empty sentences or URLs alone
+            if (!lowerSentence || lowerSentence.startsWith('http')) {
                 continue;
             }
 
-            // Extract test name
-            if (lowerLine.includes('test:') || lowerLine.includes('name:')) {
-                testName = line.split(':')[1]?.trim() || testName;
+            // Handle navigation
+            if (lowerSentence.includes('navigate') && testUrl) {
+                actions.push({
+                    type: 'navigate',
+                    selector: '',
+                    value: testUrl,
+                    description: `Navigate to ${testUrl}`
+                });
                 continue;
             }
 
-            // Parse actions
-            if (lowerLine.includes('click')) {
-                const selector = this.extractSelector(line, 'button');
-                const action = {
-                    type: 'click',
-                    selector: selector,
-                    description: line.trim()
-                };
-                
-                // Add longer timeout for text-based selectors
-                if (selector.startsWith('text=')) {
-                    action.timeout = 90000; // 90 seconds for text-based clicks
+            // Handle clicks - look for "click" followed by quoted text
+            if (lowerSentence.includes('click')) {
+                const buttonText = this.extractButtonText(sentence);
+                if (buttonText) {
+                    const action = {
+                        type: 'click',
+                        selector: `text=${buttonText}`,
+                        description: `Click the "${buttonText}" button`,
+                        timeout: 30000 // 30 seconds timeout for clicks
+                    };
+                    actions.push(action);
                 }
-                
-                actions.push(action);
-            } else if (lowerLine.includes('type') || lowerLine.includes('enter') || lowerLine.includes('input')) {
-                const value = this.extractValue(line);
-                const selector = this.extractSelector(line, 'input');
-                actions.push({
-                    type: 'fill',
-                    selector: selector,
-                    value: value,
-                    description: line.trim()
-                });
-            } else if (lowerLine.includes('select')) {
-                const value = this.extractValue(line);
-                const selector = this.extractSelector(line, 'select');
-                actions.push({
-                    type: 'select',
-                    selector: selector,
-                    value: value,
-                    description: line.trim()
-                });
-            } else if (lowerLine.includes('wait')) {
-                const waitTime = line.match(/\d+/)?.[0] || '2000';
-                actions.push({
-                    type: 'wait',
-                    value: waitTime,
-                    description: line.trim()
-                });
-            } else if (lowerLine.includes('check') && !lowerLine.includes('uncheck')) {
-                const selector = this.extractSelector(line, 'input[type="checkbox"]');
-                actions.push({
-                    type: 'check',
-                    selector: selector,
-                    description: line.trim()
-                });
-            } else if (lowerLine.includes('scroll')) {
-                actions.push({
-                    type: 'scroll',
-                    description: line.trim()
-                });
+                continue;
+            }
+
+            // Handle input/fill actions - look for "enter" followed by value and field
+            if (lowerSentence.includes('enter') && (lowerSentence.includes('field') || lowerSentence.includes('in the'))) {
+                const result = this.extractInputAction(sentence);
+                if (result.value && result.fieldName) {
+                    actions.push({
+                        type: 'fill',
+                        selector: this.generateInputSelector(result.fieldName),
+                        value: result.value,
+                        description: `Enter "${result.value}" in the "${result.fieldName}" field`
+                    });
+                }
+                continue;
             }
         }
 
         return {
             testCase: {
                 name: testName,
-                description: testDescription || instructions.substring(0, 100) + '...',
+                description: testDescription,
                 url: testUrl || 'https://example.com',
                 actions: actions
             }
         };
+    }
+
+    // Helper method to extract button text from click instructions
+    extractButtonText(sentence) {
+        // Look for text in quotes after "click"
+        const clickMatch = sentence.match(/click\s+(?:the\s+)?["']([^"']+)["']/i);
+        if (clickMatch) {
+            return clickMatch[1];
+        }
+        
+        // Look for text after "click the" without quotes
+        const clickTheMatch = sentence.match(/click\s+the\s+([^\.]+)/i);
+        if (clickTheMatch) {
+            return clickTheMatch[1].trim().replace(/\s+button$/, '');
+        }
+        
+        return null;
+    }
+
+    // Helper method to extract input actions
+    extractInputAction(sentence) {
+        // Pattern: Enter "value" in the "field name" field
+        const enterMatch = sentence.match(/enter\s+(?:email\s+)?["']([^"']+)["']\s+in\s+(?:the\s+)?["']([^"']+)["']/i);
+        if (enterMatch) {
+            return { value: enterMatch[1], fieldName: enterMatch[2] };
+        }
+        
+        // Pattern: Enter email "value" in "field" (for email specifically)
+        const emailMatch = sentence.match(/enter\s+email\s+["']([^"']+)["']\s+in\s+(?:the\s+)?["']([^"']+)["']/i);
+        if (emailMatch) {
+            return { value: emailMatch[1], fieldName: emailMatch[2] };
+        }
+        
+        // Pattern: Enter password "value" in "field" (for password specifically)  
+        const passwordMatch = sentence.match(/enter\s+password\s+["']([^"']+)["']\s+in\s+(?:the\s+)?["']([^"']+)["']/i);
+        if (passwordMatch) {
+            return { value: passwordMatch[1], fieldName: passwordMatch[2] };
+        }
+        
+        // Pattern: Enter value in field (without quotes)
+        const enterMatch2 = sentence.match(/enter\s+([^"'\s]+)\s+in\s+(?:the\s+)?(.+?)(?:\s+field)?$/i);
+        if (enterMatch2) {
+            return { value: enterMatch2[1], fieldName: enterMatch2[2].trim() };
+        }
+        
+        return { value: null, fieldName: null };
+    }
+
+    // Helper method to generate appropriate input selectors
+    generateInputSelector(fieldName) {
+        const lowerField = fieldName.toLowerCase();
+        
+        // Map common field names to better selectors
+        if (lowerField.includes('email') || lowerField.includes('user email')) {
+            return 'input[type="email"], input[name*="email"], input[id*="email"], input[placeholder*="email"]';
+        } else if (lowerField.includes('password')) {
+            return 'input[type="password"], input[name*="password"], input[id*="password"]';
+        } else if (lowerField.includes('username') || lowerField.includes('user name')) {
+            return 'input[name*="username"], input[name*="user"], input[id*="username"], input[id*="user"]';
+        } else if (lowerField.includes('nick name') || lowerField.includes('nickname')) {
+            return 'input[name*="nick"], input[id*="nick"], input[placeholder*="nick"]';
+        } else if (lowerField.includes('full name') || lowerField.includes('fullname')) {
+            return 'input[name*="fullname"], input[name*="full"], input[id*="fullname"], input[id*="full"]';
+        } else {
+            // Generic selector based on field name
+            const cleanField = fieldName.replace(/[^a-zA-Z0-9\s]/g, '').toLowerCase();
+            return `input[name*="${cleanField}"], input[id*="${cleanField}"], input[placeholder*="${cleanField}"], text=${fieldName}`;
+        }
     }
 
     extractSelector(line, defaultSelector) {
