@@ -144,9 +144,11 @@ class PlaywrightTestService {
             case 'input':
             case 'fill':
             case 'type':
+                await this.showInteractionIndicator(elementSelector, 'Typing');
                 await this.page.fill(elementSelector, value, actionOptions);
                 break;
             case 'click':
+                await this.showInteractionIndicator(elementSelector, 'Clicking');
                 await this.handleClickAction(elementSelector, actionOptions);
                 break;
             case 'verify':
@@ -158,15 +160,19 @@ class PlaywrightTestService {
                 }
                 break;
             case 'select':
+                await this.showInteractionIndicator(elementSelector, 'Selecting');
                 await this.page.selectOption(elementSelector, value, actionOptions);
                 break;
             case 'check':
+                await this.showInteractionIndicator(elementSelector, 'Checking');
                 await this.page.check(elementSelector, actionOptions);
                 break;
             case 'uncheck':
+                await this.showInteractionIndicator(elementSelector, 'Unchecking');
                 await this.page.uncheck(elementSelector, actionOptions);
                 break;
             case 'hover':
+                await this.showInteractionIndicator(elementSelector, 'Hovering');
                 await this.page.hover(elementSelector, actionOptions);
                 break;
             case 'scroll':
@@ -180,9 +186,11 @@ class PlaywrightTestService {
                 }
                 break;
             case 'assert_visible':
+                await this.showInteractionIndicator(elementSelector, 'Checking visibility');
                 await this.page.waitForSelector(elementSelector, { state: 'visible', ...actionOptions });
                 break;
             case 'assert_text':
+                await this.showInteractionIndicator(elementSelector, 'Checking text');
                 const element = await this.page.waitForSelector(elementSelector, actionOptions);
                 const text = await element.textContent();
                 if (!text.includes(value)) {
@@ -416,6 +424,174 @@ class PlaywrightTestService {
         } catch (error) {
             console.error('Element detection error:', error);
             return [];
+        }
+    }
+
+    // Visual indicator helper methods
+    async injectVisualIndicatorStyles() {
+        try {
+            await this.page.addStyleTag({
+                content: `
+                    .test-interaction-indicator {
+                        border: 3px solid #28a745 !important;
+                        box-shadow: 0 0 10px rgba(40, 167, 69, 0.6) !important;
+                        transition: border 0.3s ease, box-shadow 0.3s ease !important;
+                    }
+                    .test-interaction-indicator::before {
+                        content: "🤖 Testing..." !important;
+                        position: absolute !important;
+                        top: -25px !important;
+                        left: 0 !important;
+                        background: #28a745 !important;
+                        color: white !important;
+                        padding: 2px 8px !important;
+                        font-size: 12px !important;
+                        border-radius: 3px !important;
+                        z-index: 10000 !important;
+                        pointer-events: none !important;
+                    }
+                `
+            });
+        } catch (error) {
+            console.warn('Failed to inject visual indicator styles:', error.message);
+        }
+    }
+
+    async addVisualIndicator(selector) {
+        try {
+            // Inject styles if not already done
+            await this.injectVisualIndicatorStyles();
+            
+            // Add the indicator class to the element
+            await this.page.evaluate((sel) => {
+                let element = null;
+                
+                // Handle different selector types
+                if (sel.startsWith('text=')) {
+                    const text = sel.substring(5);
+                    // Try multiple strategies to find text-based elements
+                    element = Array.from(document.querySelectorAll('button, a, input[type="button"], input[type="submit"]'))
+                                   .find(el => el.textContent && el.textContent.trim().includes(text)) ||
+                             Array.from(document.querySelectorAll('*'))
+                                   .find(el => el.textContent && el.textContent.trim() === text && 
+                                             (el.onclick || el.tagName === 'BUTTON' || el.tagName === 'A'));
+                } else {
+                    // Regular CSS selector or XPath
+                    try {
+                        element = document.querySelector(sel);
+                    } catch (e) {
+                        // Try as XPath
+                        try {
+                            element = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+                        } catch (xe) {
+                            console.warn('Could not evaluate selector:', sel);
+                        }
+                    }
+                }
+                
+                if (element) {
+                    element.classList.add('test-interaction-indicator');
+                    // Ensure the element can show the indicator properly
+                    const computedStyle = window.getComputedStyle(element);
+                    if (computedStyle.position === 'static') {
+                        element.style.position = 'relative';
+                    }
+                    return true;
+                }
+                return false;
+            }, selector);
+        } catch (error) {
+            console.warn(`Failed to add visual indicator for ${selector}:`, error.message);
+        }
+    }
+
+    async removeVisualIndicator(selector) {
+        try {
+            await this.page.evaluate((sel) => {
+                let element = null;
+                
+                // Handle different selector types (same logic as addVisualIndicator)
+                if (sel.startsWith('text=')) {
+                    const text = sel.substring(5);
+                    element = Array.from(document.querySelectorAll('button, a, input[type="button"], input[type="submit"]'))
+                                   .find(el => el.textContent && el.textContent.trim().includes(text)) ||
+                             Array.from(document.querySelectorAll('*'))
+                                   .find(el => el.textContent && el.textContent.trim() === text && 
+                                             (el.onclick || el.tagName === 'BUTTON' || el.tagName === 'A'));
+                } else {
+                    try {
+                        element = document.querySelector(sel);
+                    } catch (e) {
+                        try {
+                            element = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+                        } catch (xe) {
+                            console.warn('Could not evaluate selector:', sel);
+                        }
+                    }
+                }
+                
+                if (element) {
+                    element.classList.remove('test-interaction-indicator');
+                }
+            }, selector);
+        } catch (error) {
+            console.warn(`Failed to remove visual indicator for ${selector}:`, error.message);
+        }
+    }
+
+    async showInteractionIndicator(selector, actionType, duration = 2000) {
+        try {
+            await this.addVisualIndicator(selector);
+            
+            // Update the indicator text based on action type
+            await this.page.evaluate((sel, action, dur) => {
+                let element = null;
+                
+                // Handle different selector types (same logic as addVisualIndicator)
+                if (sel.startsWith('text=')) {
+                    const text = sel.substring(5);
+                    element = Array.from(document.querySelectorAll('button, a, input[type="button"], input[type="submit"]'))
+                                   .find(el => el.textContent && el.textContent.trim().includes(text)) ||
+                             Array.from(document.querySelectorAll('*'))
+                                   .find(el => el.textContent && el.textContent.trim() === text && 
+                                             (el.onclick || el.tagName === 'BUTTON' || el.tagName === 'A'));
+                } else {
+                    try {
+                        element = document.querySelector(sel);
+                    } catch (e) {
+                        try {
+                            element = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+                        } catch (xe) {
+                            console.warn('Could not evaluate selector:', sel);
+                        }
+                    }
+                }
+                
+                if (element && element.classList.contains('test-interaction-indicator')) {
+                    const style = document.createElement('style');
+                    style.textContent = `
+                        .test-interaction-indicator::before {
+                            content: "🤖 ${action}..." !important;
+                        }
+                    `;
+                    document.head.appendChild(style);
+                    
+                    // Remove the style after a short time to reset
+                    setTimeout(() => {
+                        if (style.parentNode) {
+                            style.parentNode.removeChild(style);
+                        }
+                    }, dur);
+                }
+            }, selector, actionType, duration);
+            
+            // Remove indicator after duration
+            setTimeout(async () => {
+                await this.removeVisualIndicator(selector);
+            }, duration);
+            
+        } catch (error) {
+            console.warn(`Failed to show interaction indicator for ${selector}:`, error.message);
         }
     }
 }
