@@ -6,6 +6,56 @@ const OpenAIService = require('../services/openai');
 
 const router = express.Router();
 
+// Helper function to validate and sanitize URL
+function validateAndSanitizeUrl(url) {
+    if (!url || typeof url !== 'string') {
+        throw new Error('URL is required and must be a string');
+    }
+    
+    // Remove potentially dangerous characters
+    const sanitized = url.trim().replace(/[<>'"]/g, '');
+    
+    // Basic URL validation
+    if (!sanitized.match(/^https?:\/\/.+/) && !sanitized.startsWith('/')) {
+        throw new Error('URL must be a valid HTTP/HTTPS URL or start with /');
+    }
+    
+    return sanitized;
+}
+
+// Helper function to validate test case actions
+function validateActions(actions) {
+    if (!actions) return [];
+    
+    if (!Array.isArray(actions)) {
+        throw new Error('Actions must be an array');
+    }
+    
+    const allowedActionTypes = ['navigate', 'input', 'click', 'verify', 'wait', 'assert_visible', 'assert_text', 'fill', 'type', 'select', 'check', 'uncheck', 'hover', 'scroll'];
+    
+    return actions.map((action, index) => {
+        if (!action.type) {
+            throw new Error(`Action ${index + 1} must have a type`);
+        }
+        
+        if (!allowedActionTypes.includes(action.type)) {
+            throw new Error(`Invalid action type: ${action.type}`);
+        }
+        
+        // Sanitize string fields
+        const sanitized = {
+            type: action.type,
+            locator: action.locator ? action.locator.replace(/[<>'"]/g, '') : undefined,
+            selector: action.selector ? action.selector.replace(/[<>'"]/g, '') : undefined,
+            value: action.value ? action.value.replace(/[<>]/g, '') : undefined,
+            description: action.description ? action.description.replace(/[<>]/g, '') : undefined,
+            expectedUrl: action.expectedUrl ? action.expectedUrl.replace(/[<>'"]/g, '') : undefined
+        };
+        
+        return sanitized;
+    });
+}
+
 // Create a new test case
 router.post('/cases', authenticateToken, (req, res) => {
     try {
@@ -15,11 +65,21 @@ router.post('/cases', authenticateToken, (req, res) => {
             return res.status(400).json({ error: 'Name and URL are required' });
         }
 
+        // Input validation and sanitization
+        const sanitizedName = name.trim().replace(/[<>'"]/g, '');
+        const sanitizedDescription = description ? description.trim().replace(/[<>]/g, '') : '';
+        const sanitizedUrl = validateAndSanitizeUrl(url);
+        const validatedActions = validateActions(actions);
+
+        if (sanitizedName.length < 1 || sanitizedName.length > 255) {
+            return res.status(400).json({ error: 'Test name must be between 1 and 255 characters' });
+        }
+
         const db = getDatabase();
 
         db.run(
             'INSERT INTO test_cases (name, description, url, actions, user_id) VALUES (?, ?, ?, ?, ?)',
-            [name, description || '', url, JSON.stringify(actions || []), req.user.id],
+            [sanitizedName, sanitizedDescription, sanitizedUrl, JSON.stringify(validatedActions), req.user.id],
             function(err) {
                 db.close();
                 
@@ -32,16 +92,19 @@ router.post('/cases', authenticateToken, (req, res) => {
                     message: 'Test case created successfully',
                     testCase: {
                         id: this.lastID,
-                        name,
-                        description,
-                        url,
-                        actions
+                        name: sanitizedName,
+                        description: sanitizedDescription,
+                        url: sanitizedUrl,
+                        actions: validatedActions
                     }
                 });
             }
         );
     } catch (error) {
         console.error('Create test case error:', error);
+        if (error.message.includes('URL') || error.message.includes('Actions') || error.message.includes('type')) {
+            return res.status(400).json({ error: error.message });
+        }
         res.status(500).json({ error: 'Server error' });
     }
 });
@@ -172,7 +235,7 @@ router.post('/execute/:id', authenticateToken, async (req, res) => {
 // Execute all test cases
 router.post('/execute-all', authenticateToken, async (req, res) => {
     try {
-        const { browserType = 'chromium', headless = true } = req.body;
+        const { browserType = 'chromium', headless = true, parallel = false, maxConcurrency = 3 } = req.body;
         const db = getDatabase();
 
         // Get all test cases for the user
@@ -192,63 +255,112 @@ router.post('/execute-all', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'No test cases found' });
         }
 
-        const testService = new PlaywrightTestService();
         const results = [];
 
-        try {
-            await testService.initialize(browserType, headless);
+        if (parallel && testCases.length > 1) {
+            // Parallel execution
+            const executeTestBatch = async (testCaseBatch) => {
+                const testService = new PlaywrightTestService();
+                const batchResults = [];
+                
+                try {
+                    await testService.initialize(browserType, headless);
+                    
+                    for (const testCase of testCaseBatch) {
+                        testCase.actions = JSON.parse(testCase.actions || '[]');
+                        const result = await testService.runTest(testCase);
 
-            for (const testCase of testCases) {
-                testCase.actions = JSON.parse(testCase.actions || '[]');
-                const result = await testService.runTest(testCase);
+                        // Save test result
+                        await new Promise((resolve, reject) => {
+                            db.run(
+                                'INSERT INTO test_results (test_case_id, status, execution_time, error_message, screenshot_path) VALUES (?, ?, ?, ?, ?)',
+                                [testCase.id, result.status, result.executionTime, result.errorMessage, result.screenshotPath],
+                                function(err) {
+                                    if (err) reject(err);
+                                    else resolve(this.lastID);
+                                }
+                            );
+                        });
 
-                // Save test result
-                await new Promise((resolve, reject) => {
-                    db.run(
-                        'INSERT INTO test_results (test_case_id, status, execution_time, error_message, screenshot_path) VALUES (?, ?, ?, ?, ?)',
-                        [testCase.id, result.status, result.executionTime, result.errorMessage, result.screenshotPath],
-                        function(err) {
-                            if (err) reject(err);
-                            else resolve(this.lastID);
-                        }
-                    );
-                });
+                        batchResults.push({
+                            testCaseId: testCase.id,
+                            testCaseName: testCase.name,
+                            ...result
+                        });
+                    }
+                } finally {
+                    await testService.close();
+                }
+                
+                return batchResults;
+            };
 
-                results.push({
-                    testCaseId: testCase.id,
-                    testCaseName: testCase.name,
-                    ...result
-                });
+            // Split test cases into batches for parallel execution
+            const batches = [];
+            for (let i = 0; i < testCases.length; i += maxConcurrency) {
+                batches.push(testCases.slice(i, i + maxConcurrency));
             }
 
-            await testService.close();
-            db.close();
-
-            res.json({
-                message: 'All tests executed successfully',
-                results,
-                summary: {
-                    total: results.length,
-                    passed: results.filter(r => r.status === 'success').length,
-                    failed: results.filter(r => r.status === 'failed').length
-                }
-            });
-
-        } catch (testError) {
-            await testService.close();
-            db.close();
+            // Execute batches in parallel
+            const batchPromises = batches.map(batch => executeTestBatch(batch));
+            const batchResults = await Promise.all(batchPromises);
             
-            console.error('Batch test execution error:', testError);
-            res.status(500).json({ 
-                error: 'Batch test execution failed',
-                details: testError.message,
-                partialResults: results
-            });
+            // Flatten results
+            results.push(...batchResults.flat());
+            
+        } else {
+            // Sequential execution (original implementation)
+            const testService = new PlaywrightTestService();
+            
+            try {
+                await testService.initialize(browserType, headless);
+
+                for (const testCase of testCases) {
+                    testCase.actions = JSON.parse(testCase.actions || '[]');
+                    const result = await testService.runTest(testCase);
+
+                    // Save test result
+                    await new Promise((resolve, reject) => {
+                        db.run(
+                            'INSERT INTO test_results (test_case_id, status, execution_time, error_message, screenshot_path) VALUES (?, ?, ?, ?, ?)',
+                            [testCase.id, result.status, result.executionTime, result.errorMessage, result.screenshotPath],
+                            function(err) {
+                                if (err) reject(err);
+                                else resolve(this.lastID);
+                            }
+                        );
+                    });
+
+                    results.push({
+                        testCaseId: testCase.id,
+                        testCaseName: testCase.name,
+                        ...result
+                    });
+                }
+            } finally {
+                await testService.close();
+            }
         }
+
+        db.close();
+
+        res.json({
+            message: 'All tests executed successfully',
+            executionMode: parallel ? 'parallel' : 'sequential',
+            results,
+            summary: {
+                total: results.length,
+                passed: results.filter(r => r.status === 'success').length,
+                failed: results.filter(r => r.status === 'failed').length
+            }
+        });
 
     } catch (error) {
         console.error('Execute all tests error:', error);
-        res.status(500).json({ error: 'Server error' });
+        res.status(500).json({ 
+            error: 'Batch test execution failed',
+            details: error.message 
+        });
     }
 });
 
@@ -308,16 +420,56 @@ router.post('/ai/parse', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: 'Instructions are required' });
         }
 
+        if (typeof instructions !== 'string') {
+            return res.status(400).json({ error: 'Instructions must be a string' });
+        }
+
+        if (instructions.length > 5000) {
+            return res.status(400).json({ error: 'Instructions are too long (max 5000 characters)' });
+        }
+
+        // Sanitize instructions
+        const sanitizedInstructions = instructions.trim().replace(/[<>]/g, '');
+
         const aiService = new OpenAIService();
-        const parsed = await aiService.parseTestInstructions(instructions);
+        const parsed = await aiService.parseTestInstructions(sanitizedInstructions);
+
+        // Validate the parsed result
+        if (!parsed || !parsed.testCase) {
+            return res.status(400).json({ error: 'Failed to parse instructions into valid test case' });
+        }
+
+        // Additional validation of the parsed test case
+        const { testCase } = parsed;
+        if (!testCase.name || !testCase.url) {
+            return res.status(400).json({ error: 'Parsed test case is missing required fields (name, url)' });
+        }
+
+        // Validate and sanitize the parsed actions
+        try {
+            testCase.actions = validateActions(testCase.actions);
+            testCase.url = validateAndSanitizeUrl(testCase.url);
+            testCase.name = testCase.name.trim().replace(/[<>'"]/g, '');
+            testCase.description = testCase.description ? testCase.description.trim().replace(/[<>]/g, '') : '';
+        } catch (validationError) {
+            return res.status(400).json({ error: `Invalid parsed test case: ${validationError.message}` });
+        }
 
         res.json({
             message: 'Instructions parsed successfully',
-            parsed
+            parsed: { testCase }
         });
 
     } catch (error) {
         console.error('AI parsing error:', error);
+        
+        if (error.message.includes('API') || error.message.includes('OpenAI')) {
+            return res.status(503).json({ 
+                error: 'AI service temporarily unavailable. Please try again later.',
+                fallback: 'You can create test cases manually or use the basic fallback parser.'
+            });
+        }
+        
         res.status(500).json({ error: 'Failed to parse instructions' });
     }
 });
