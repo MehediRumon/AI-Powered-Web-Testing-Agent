@@ -200,8 +200,8 @@ Example output:
             if (text.includes('#') || text.includes('.') || text.includes('[')) {
                 return text; // Looks like a CSS selector
             } else {
-                // Convert text to selector
-                return `*:contains("${text}")`;
+                // Convert text to Playwright text locator
+                return `text=${text}`;
             }
         }
 
