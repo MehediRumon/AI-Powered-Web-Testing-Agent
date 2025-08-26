@@ -193,15 +193,31 @@ Example output:
     }
 
     extractSelector(line, defaultSelector) {
-        // Try to extract quoted text as selector
-        const quotedMatch = line.match(/["']([^"']+)["']/);
-        if (quotedMatch) {
-            const text = quotedMatch[1];
-            if (text.includes('#') || text.includes('.') || text.includes('[')) {
-                return text; // Looks like a CSS selector
+        // Find all quoted strings in the line
+        const allQuotedMatches = line.match(/["']([^"']+)["']/g);
+        
+        if (allQuotedMatches && allQuotedMatches.length > 0) {
+            // Extract the content of all quoted strings
+            const quotedValues = allQuotedMatches.map(match => match.slice(1, -1)); // Remove quotes
+            
+            // For selectors, prefer field labels over input values
+            for (const text of quotedValues) {
+                if (text.includes('#') || text.includes('.') || text.includes('[')) {
+                    return text; // Looks like a CSS selector
+                }
+                
+                // Prefer field labels for selectors
+                if (this.isFieldLabel(text)) {
+                    return `text=${text}`;
+                }
+            }
+            
+            // If no field label found, use the first quoted string
+            const firstText = quotedValues[0];
+            if (firstText.includes('#') || firstText.includes('.') || firstText.includes('[')) {
+                return firstText; // Looks like a CSS selector
             } else {
-                // Convert text to Playwright text locator
-                return `text=${text}`;
+                return `text=${firstText}`;
             }
         }
 
@@ -218,10 +234,43 @@ Example output:
     }
 
     extractValue(line) {
-        // Try to extract quoted value
-        const quotedMatch = line.match(/["']([^"']+)["']/);
-        if (quotedMatch) {
-            return quotedMatch[1];
+        // Find all quoted strings in the line
+        const allQuotedMatches = line.match(/["']([^"']+)["']/g);
+        
+        if (allQuotedMatches && allQuotedMatches.length > 0) {
+            // Extract the content of all quoted strings
+            const quotedValues = allQuotedMatches.map(match => match.slice(1, -1)); // Remove quotes
+            
+            if (quotedValues.length === 1) {
+                return quotedValues[0];
+            }
+            
+            // If multiple quoted strings, try to determine which is the value to input
+            for (let i = 0; i < quotedValues.length; i++) {
+                const value = quotedValues[i];
+                
+                // Skip values that look like field labels or UI element text
+                if (this.isFieldLabel(value)) {
+                    continue;
+                }
+                
+                // Prefer values that look like actual input data
+                if (this.isInputValue(value)) {
+                    return value;
+                }
+            }
+            
+            // If no clear input value found, look for patterns that suggest the actual value
+            // Priority: last quoted string that's not a common field label
+            for (let i = quotedValues.length - 1; i >= 0; i--) {
+                const value = quotedValues[i];
+                if (!this.isFieldLabel(value)) {
+                    return value;
+                }
+            }
+            
+            // Fallback to the last quoted string
+            return quotedValues[quotedValues.length - 1];
         }
 
         // Try to extract value after "with" or ":" 
@@ -231,6 +280,58 @@ Example output:
         }
 
         return '';
+    }
+
+    // Helper method to identify if a string looks like a field label
+    isFieldLabel(text) {
+        const fieldLabels = [
+            'username', 'user name', 'user email', 'email', 'password', 'login', 'log in',
+            'first name', 'last name', 'phone', 'address', 'field',
+            'search', 'filter', 'dropdown', 'select', 'checkbox', 'radio'
+        ];
+        
+        // Common button/action words that shouldn't be treated as field labels
+        const buttonWords = ['submit', 'button', 'click', 'press', 'cancel', 'ok', 'yes', 'no'];
+        
+        const lowerText = text.toLowerCase().trim();
+        
+        // Don't treat button text as field labels
+        if (buttonWords.includes(lowerText)) {
+            return false;
+        }
+        
+        return fieldLabels.some(label => 
+            lowerText === label || 
+            lowerText.includes(label + ' field') ||
+            lowerText.includes(label + ' input') ||
+            lowerText.includes(label + ' box')
+        );
+    }
+
+    // Helper method to identify if a string looks like an actual input value
+    isInputValue(text) {
+        // Email pattern
+        if (text.includes('@') && text.includes('.')) {
+            return true;
+        }
+        
+        // URL pattern
+        if (text.startsWith('http://') || text.startsWith('https://')) {
+            return true;
+        }
+        
+        // Phone number pattern
+        if (/^\+?[\d\s\-\(\)]{7,}$/.test(text)) {
+            return true;
+        }
+        
+        // If it contains specific characters that suggest it's data, not a label
+        // But be more specific about length and content
+        if (text.length > 15 && (text.includes('@') || text.includes('.') || /\d{4,}/.test(text))) {
+            return true;
+        }
+        
+        return false;
     }
 
     async generateTestFromURL(url) {
