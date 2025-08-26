@@ -157,26 +157,73 @@ class PlaywrightTestService {
     }
 
     async executeAction(action) {
-        // Check if page is available
-        if (!this.page && !this.mockMode) {
-            throw new Error('Browser page is not initialized. Call initialize() first.');
+                        const stepDescription = action.description || `${action.type} on ${action.locator || action.selector || action.target}`;
+                        result.steps.push({
+                            stepNumber: i + 1,
+                            description: stepDescription,
+                            status: 'success',
+                            timestamp: new Date().toISOString()
+                        });
+                    } catch (stepError) {
+                        const stepDescription = action.description || `${action.type} on ${action.locator || action.selector || action.target}`;
+                        result.steps.push({
+                            stepNumber: i + 1,
+                            description: stepDescription,
+                            status: 'failed',
+                            error: stepError.message,
+                            timestamp: new Date().toISOString()
+                        });
+                        throw stepError; // Re-throw to handle in outer catch
+                    }
+                }
+            }
+
+            // Take screenshot
+            const screenshotDir = path.join(process.cwd(), 'reports', 'screenshots');
+            if (!fs.existsSync(screenshotDir)) {
+                fs.mkdirSync(screenshotDir, { recursive: true });
+            }
+
+            const screenshotPath = path.join(screenshotDir, `test-${testCase.id || Date.now()}-${Date.now()}.png`);
+            await this.page.screenshot({ path: screenshotPath, fullPage: true });
+            result.screenshotPath = screenshotPath;
+
+            result.executionTime = Date.now() - startTime;
+            
+        } catch (error) {
+            console.error('Test execution error:', error);
+            result.status = 'failed';
+            result.errorMessage = error.message;
+            result.executionTime = Date.now() - startTime;
+
+            // Take screenshot on failure
+            try {
+                const screenshotDir = path.join(process.cwd(), 'reports', 'screenshots');
+                if (!fs.existsSync(screenshotDir)) {
+                    fs.mkdirSync(screenshotDir, { recursive: true });
+                }
+                const screenshotPath = path.join(screenshotDir, `error-${testCase.id || Date.now()}-${Date.now()}.png`);
+                await this.page.screenshot({ path: screenshotPath, fullPage: true });
+                result.screenshotPath = screenshotPath;
+            } catch (screenshotError) {
+                console.error('Failed to take error screenshot:', screenshotError);
+            }
         }
 
-        const { type, selector, value, description, expectedUrl, timeout } = action;
-        const elementSelector = action.locator || action.selector || action.target || selector;
-        const actionOptions = { timeout: timeout || 30000 };
+        return result;
+    }
 
-        console.log(`🔧 Executing action: ${type} on "${elementSelector}" with value: "${value || 'N/A'}"`);
-
-        // In mock mode, just simulate
-        if (this.mockMode) {
-            await this.simulateAction(action);
-            return;
-        }
+    async executeAction(action) {
+        const { type, selector, locator, value, options = {}, expectedUrl, timeout = 60000 } = action;
+        
+        // Support both 'selector' and 'locator' for compatibility
+        const elementSelector = locator || selector;
+        
+        // Set default timeout for operations that might need more time
+        const actionOptions = { timeout, ...options };
 
         switch (type) {
             case 'navigate':
-                console.log(`🌐 Navigating to: ${value || elementSelector}`);
                 if (value) {
                     await this.page.goto(value, { waitUntil: 'networkidle' });
                 } else if (elementSelector) {
@@ -238,32 +285,27 @@ class PlaywrightTestService {
                 await this.page.hover(elementSelector, actionOptions);
                 break;
             case 'scroll':
-                if (elementSelector) {
-                    await this.page.locator(elementSelector).scrollIntoViewIfNeeded();
-                } else {
-                    await this.page.evaluate(() => window.scrollBy(0, window.innerHeight));
-                }
+                await this.page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
                 break;
             case 'wait':
-                const waitTime = parseInt(value) || 2000;
-                console.log(`⏳ Waiting for ${waitTime}ms`);
-                await this.page.waitForTimeout(waitTime);
+                if (value) {
+                    await this.page.waitForTimeout(parseInt(value));
+                } else if (elementSelector) {
+                    await this.page.waitForSelector(elementSelector, actionOptions);
+                }
                 break;
             case 'assert_visible':
-                await this.page.waitForSelector(elementSelector, { 
-                    state: 'visible', 
-                    timeout: actionOptions.timeout 
-                });
+                await this.page.waitForSelector(elementSelector, { state: 'visible', ...actionOptions });
                 break;
             case 'assert_text':
-                const element = await this.page.locator(elementSelector);
-                const textContent = await element.textContent();
-                if (!textContent || !textContent.includes(value)) {
-                    throw new Error(`Expected element '${elementSelector}' to contain text '${value}' but got '${textContent}'`);
+                const element = await this.page.waitForSelector(elementSelector, actionOptions);
+                const text = await element.textContent();
+                if (!text.includes(value)) {
+                    throw new Error(`Expected element to contain text '${value}' but got '${text}'`);
                 }
                 break;
             default:
-                throw new Error(`Unknown action type: ${type}`);
+                console.warn(`Unknown action type: ${type}`);
         }
     }
 
@@ -419,7 +461,7 @@ class PlaywrightTestService {
                     // Final fallback: try to find any clickable element containing the text
                     try {
                         await this.page.locator(`text="${text}"`).first().click({ ...options, timeout: 5000 });
-                        console.log(`✅ Successfully clicked using fallback text locator`);
+                        console.log(`Successfully clicked using fallback text locator`);
                         return;
                     } catch (fallbackError) {
                         // Throw comprehensive error message
@@ -475,7 +517,59 @@ class PlaywrightTestService {
                 this.browser = null;
             }
         } catch (error) {
-            console.warn('Error closing browser:', error.message);
+            console.error('Error closing browser:', error);
+        }
+    }
+
+    // AI-powered element detection
+    async detectElements(page = null) {
+        const targetPage = page || this.page;
+        if (!targetPage) {
+            throw new Error('No page available for element detection');
+        }
+
+        try {
+            // Get all interactive elements
+            const elements = await targetPage.evaluate(() => {
+                const interactiveElements = [];
+                
+                // Common interactive selectors
+                const selectors = [
+                    'button', 'input', 'select', 'textarea', 'a', 
+                    '[onclick]', '[role="button"]', '[role="link"]',
+                    '.btn', '.button', '.link'
+                ];
+
+                selectors.forEach(selector => {
+                    const elements = document.querySelectorAll(selector);
+                    elements.forEach((el, index) => {
+                        const rect = el.getBoundingClientRect();
+                        if (rect.width > 0 && rect.height > 0) {
+                            interactiveElements.push({
+                                tagName: el.tagName.toLowerCase(),
+                                type: el.type || '',
+                                id: el.id || '',
+                                className: el.className || '',
+                                text: el.textContent ? el.textContent.trim().substring(0, 50) : '',
+                                selector: selector + `:nth-child(${index + 1})`,
+                                position: {
+                                    x: rect.x,
+                                    y: rect.y,
+                                    width: rect.width,
+                                    height: rect.height
+                                }
+                            });
+                        }
+                    });
+                });
+
+                return interactiveElements;
+            });
+
+            return elements;
+        } catch (error) {
+            console.error('Element detection error:', error);
+            return [];
         }
     }
 }
