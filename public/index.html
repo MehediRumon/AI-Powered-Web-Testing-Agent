@@ -156,6 +156,13 @@
             margin-bottom: 1rem;
         }
 
+        .test-case-actions, .test-result-actions {
+            margin-top: 1rem;
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
         .test-result {
             border-left: 4px solid #28a745;
             padding: 1rem;
@@ -316,17 +323,21 @@
                             <form id="createTestForm">
                                 <div class="form-group">
                                     <label for="testName">Test Name</label>
-                                    <input type="text" id="testName" required>
+                                    <input type="text" id="testName" name="name" required>
                                 </div>
                                 <div class="form-group">
                                     <label for="testUrl">URL</label>
-                                    <input type="url" id="testUrl" required>
+                                    <input type="url" id="testUrl" name="url" required>
                                 </div>
                                 <div class="form-group">
                                     <label for="testDescription">Description</label>
-                                    <textarea id="testDescription" rows="3"></textarea>
+                                    <textarea id="testDescription" name="description" rows="3"></textarea>
                                 </div>
-                                <button type="submit">Create Test</button>
+                                <div class="form-group">
+                                    <label for="testActions">Test Actions (JSON format)</label>
+                                    <textarea id="testActions" name="actions" rows="6" placeholder='[{"type": "navigate", "value": "https://example.com"}, {"type": "click", "selector": "#button"}]'></textarea>
+                                </div>
+                                <button type="submit">Create Test Case</button>
                             </form>
                         </div>
 
@@ -599,24 +610,49 @@
             e.preventDefault();
             const formData = new FormData(e.target);
             const data = Object.fromEntries(formData);
-
+            
+            // Parse actions if provided
+            if (data.actions) {
+                try {
+                    data.actions = JSON.parse(data.actions);
+                } catch (error) {
+                    showStatus('Invalid JSON format in actions field', 'error');
+                    return;
+                }
+            } else {
+                data.actions = [];
+            }
+            
+            // Check if we're editing an existing test case
+            const editId = e.target.dataset.editId;
+            const isEdit = editId && editId !== '';
+            
             try {
-                const response = await apiCall('/api/test/cases', {
-                    method: 'POST',
+                const url = isEdit ? `/api/test/cases/${editId}` : '/api/test/cases';
+                const method = isEdit ? 'PUT' : 'POST';
+                
+                const response = await apiCall(url, {
+                    method: method,
                     body: JSON.stringify(data)
                 });
 
                 const result = await response.json();
                 
                 if (response.ok) {
-                    showStatus('Test case created successfully', 'success');
+                    showStatus(isEdit ? 'Test case updated successfully' : 'Test case created successfully', 'success');
                     e.target.reset();
+                    
+                    // Reset form state
+                    delete e.target.dataset.editId;
+                    const submitBtn = e.target.querySelector('button[type="submit"]');
+                    submitBtn.textContent = 'Create Test Case';
+                    
                     loadTestCases();
                 } else {
                     showStatus(result.error, 'error');
                 }
             } catch (error) {
-                showStatus('Failed to create test case: ' + error.message, 'error');
+                showStatus('Failed to ' + (isEdit ? 'update' : 'create') + ' test case: ' + error.message, 'error');
             }
         });
 
@@ -757,6 +793,198 @@
             }
         }
 
+        // Edit test case
+        async function editTestCase(testId) {
+            try {
+                // First get the test case data
+                const response = await apiCall(`/api/test/cases/${testId}`);
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    showStatus('Failed to load test case: ' + result.error, 'error');
+                    return;
+                }
+                
+                const testCase = result.testCase;
+                
+                // Populate form with existing data
+                document.getElementById('testName').value = testCase.name;
+                document.getElementById('testDescription').value = testCase.description || '';
+                document.getElementById('testUrl').value = testCase.url;
+                document.getElementById('testActions').value = JSON.stringify(testCase.actions, null, 2);
+                
+                // Store the ID for updating
+                document.getElementById('createTestForm').dataset.editId = testId;
+                
+                // Change form submit button text
+                const submitBtn = document.querySelector('#createTestForm button[type="submit"]');
+                submitBtn.textContent = 'Update Test Case';
+                
+                // Switch to create test tab
+                switchTestTab('create');
+                
+                showStatus('Test case loaded for editing', 'info');
+            } catch (error) {
+                showStatus('Failed to load test case: ' + error.message, 'error');
+            }
+        }
+
+        // Delete test case
+        async function deleteTestCase(testId) {
+            if (!confirm('Are you sure you want to delete this test case? This will also delete all associated test results.')) {
+                return;
+            }
+            
+            try {
+                showStatus('Deleting test case...', 'info');
+                
+                const response = await apiCall(`/api/test/cases/${testId}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showStatus('Test case deleted successfully', 'success');
+                    loadTestCases();
+                    loadTestResults();
+                } else {
+                    showStatus('Failed to delete test case: ' + result.error, 'error');
+                }
+            } catch (error) {
+                showStatus('Failed to delete test case: ' + error.message, 'error');
+            }
+        }
+
+        // Edit test result
+        async function editTestResult(resultId) {
+            try {
+                // Get the test result data
+                const response = await apiCall(`/api/test/results/${resultId}`);
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    showStatus('Failed to load test result: ' + result.error, 'error');
+                    return;
+                }
+                
+                const testResult = result.result;
+                
+                // Create edit form
+                const editForm = `
+                    <div id="editResultModal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; justify-content: center; align-items: center;">
+                        <div style="background: white; padding: 2rem; border-radius: 8px; max-width: 500px; width: 90%;">
+                            <h3>Edit Test Result</h3>
+                            <form id="editResultForm">
+                                <div class="form-group">
+                                    <label for="editStatus">Status:</label>
+                                    <select id="editStatus" required>
+                                        <option value="success" ${testResult.status === 'success' ? 'selected' : ''}>Success</option>
+                                        <option value="failed" ${testResult.status === 'failed' ? 'selected' : ''}>Failed</option>
+                                        <option value="pending" ${testResult.status === 'pending' ? 'selected' : ''}>Pending</option>
+                                        <option value="skipped" ${testResult.status === 'skipped' ? 'selected' : ''}>Skipped</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="editExecutionTime">Execution Time (ms):</label>
+                                    <input type="number" id="editExecutionTime" value="${testResult.execution_time || ''}" min="0">
+                                </div>
+                                <div class="form-group">
+                                    <label for="editErrorMessage">Error Message:</label>
+                                    <textarea id="editErrorMessage" rows="3">${testResult.error_message || ''}</textarea>
+                                </div>
+                                <div class="form-group">
+                                    <label for="editScreenshotPath">Screenshot Path:</label>
+                                    <input type="text" id="editScreenshotPath" value="${testResult.screenshot_path || ''}">
+                                </div>
+                                <div class="form-group">
+                                    <label for="editReportPath">Report Path:</label>
+                                    <input type="text" id="editReportPath" value="${testResult.report_path || ''}">
+                                </div>
+                                <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                                    <button type="submit" class="btn-success">Update Result</button>
+                                    <button type="button" onclick="closeEditResultModal()" class="btn-secondary">Cancel</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                `;
+                
+                document.body.insertAdjacentHTML('beforeend', editForm);
+                
+                // Handle form submission
+                document.getElementById('editResultForm').addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    
+                    const updateData = {
+                        status: document.getElementById('editStatus').value,
+                        execution_time: parseInt(document.getElementById('editExecutionTime').value) || null,
+                        error_message: document.getElementById('editErrorMessage').value.trim() || null,
+                        screenshot_path: document.getElementById('editScreenshotPath').value.trim() || null,
+                        report_path: document.getElementById('editReportPath').value.trim() || null
+                    };
+                    
+                    try {
+                        showStatus('Updating test result...', 'info');
+                        
+                        const updateResponse = await apiCall(`/api/test/results/${resultId}`, {
+                            method: 'PUT',
+                            body: JSON.stringify(updateData)
+                        });
+                        
+                        const updateResult = await updateResponse.json();
+                        
+                        if (updateResponse.ok) {
+                            showStatus('Test result updated successfully', 'success');
+                            closeEditResultModal();
+                            loadTestResults();
+                        } else {
+                            showStatus('Failed to update test result: ' + updateResult.error, 'error');
+                        }
+                    } catch (error) {
+                        showStatus('Failed to update test result: ' + error.message, 'error');
+                    }
+                });
+                
+            } catch (error) {
+                showStatus('Failed to load test result: ' + error.message, 'error');
+            }
+        }
+
+        // Close edit result modal
+        function closeEditResultModal() {
+            const modal = document.getElementById('editResultModal');
+            if (modal) {
+                modal.remove();
+            }
+        }
+
+        // Delete test result
+        async function deleteTestResult(resultId) {
+            if (!confirm('Are you sure you want to delete this test result?')) {
+                return;
+            }
+            
+            try {
+                showStatus('Deleting test result...', 'info');
+                
+                const response = await apiCall(`/api/test/results/${resultId}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showStatus('Test result deleted successfully', 'success');
+                    loadTestResults();
+                } else {
+                    showStatus('Failed to delete test result: ' + result.error, 'error');
+                }
+            } catch (error) {
+                showStatus('Failed to delete test result: ' + error.message, 'error');
+            }
+        }
+
         // Show/hide parallel execution options
         document.getElementById('parallelExecution').addEventListener('change', function() {
             const maxConcurrencyGroup = document.getElementById('maxConcurrencyGroup');
@@ -821,7 +1049,11 @@
                             <p><strong>URL:</strong> ${testCase.url}</p>
                             <p><strong>Description:</strong> ${testCase.description || 'No description'}</p>
                             <p><strong>Actions:</strong> ${testCase.actions.length} step(s)</p>
-                            <button onclick="executeTest(${testCase.id})" class="btn-success">Run Test</button>
+                            <div class="test-case-actions">
+                                <button onclick="executeTest(${testCase.id})" class="btn-success">Run Test</button>
+                                <button onclick="editTestCase(${testCase.id})" class="btn-secondary">Edit</button>
+                                <button onclick="deleteTestCase(${testCase.id})" class="btn-danger">Delete</button>
+                            </div>
                         </div>
                     `).join('');
                 } else {
@@ -856,6 +1088,10 @@
                             <p><strong>Executed:</strong> ${new Date(testResult.executed_at).toLocaleString()}</p>
                             ${testResult.error_message ? `<p><strong>Error:</strong> ${testResult.error_message}</p>` : ''}
                             ${testResult.screenshot_path ? `<p><strong>Screenshot:</strong> Available</p>` : ''}
+                            <div class="test-result-actions">
+                                <button onclick="editTestResult(${testResult.id})" class="btn-secondary">Edit</button>
+                                <button onclick="deleteTestResult(${testResult.id})" class="btn-danger">Delete</button>
+                            </div>
                         </div>
                     `).join('');
                 } else {

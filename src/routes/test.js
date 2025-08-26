@@ -158,6 +158,141 @@ router.get('/cases/:id', authenticateToken, (req, res) => {
     );
 });
 
+// Update a test case
+router.put('/cases/:id', authenticateToken, (req, res) => {
+    try {
+        const testCaseId = req.params.id;
+        const { name, description, url, actions } = req.body;
+
+        if (!name || !url) {
+            return res.status(400).json({ error: 'Name and URL are required' });
+        }
+
+        // Input validation and sanitization
+        const sanitizedName = name.trim().replace(/[<>'"]/g, '');
+        const sanitizedDescription = description ? description.trim().replace(/[<>]/g, '') : '';
+        const sanitizedUrl = validateAndSanitizeUrl(url);
+        const validatedActions = validateActions(actions);
+
+        if (sanitizedName.length < 1 || sanitizedName.length > 255) {
+            return res.status(400).json({ error: 'Test name must be between 1 and 255 characters' });
+        }
+
+        const db = getDatabase();
+
+        // First check if the test case exists and belongs to the user
+        db.get(
+            'SELECT id FROM test_cases WHERE id = ? AND user_id = ?',
+            [testCaseId, req.user.id],
+            (err, existingTestCase) => {
+                if (err) {
+                    db.close();
+                    return res.status(500).json({ error: 'Database error' });
+                }
+
+                if (!existingTestCase) {
+                    db.close();
+                    return res.status(404).json({ error: 'Test case not found' });
+                }
+
+                // Update the test case
+                db.run(
+                    'UPDATE test_cases SET name = ?, description = ?, url = ?, actions = ? WHERE id = ? AND user_id = ?',
+                    [sanitizedName, sanitizedDescription, sanitizedUrl, JSON.stringify(validatedActions), testCaseId, req.user.id],
+                    function(err) {
+                        db.close();
+                        
+                        if (err) {
+                            console.error('Database error:', err);
+                            return res.status(500).json({ error: 'Failed to update test case' });
+                        }
+
+                        if (this.changes === 0) {
+                            return res.status(404).json({ error: 'Test case not found' });
+                        }
+
+                        res.json({
+                            message: 'Test case updated successfully',
+                            testCase: {
+                                id: parseInt(testCaseId),
+                                name: sanitizedName,
+                                description: sanitizedDescription,
+                                url: sanitizedUrl,
+                                actions: validatedActions
+                            }
+                        });
+                    }
+                );
+            }
+        );
+    } catch (error) {
+        console.error('Update test case error:', error);
+        if (error.message.includes('URL') || error.message.includes('Actions') || error.message.includes('type')) {
+            return res.status(400).json({ error: error.message });
+        }
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Delete a test case
+router.delete('/cases/:id', authenticateToken, (req, res) => {
+    const testCaseId = req.params.id;
+    const db = getDatabase();
+
+    // First check if the test case exists and belongs to the user
+    db.get(
+        'SELECT id FROM test_cases WHERE id = ? AND user_id = ?',
+        [testCaseId, req.user.id],
+        (err, existingTestCase) => {
+            if (err) {
+                db.close();
+                return res.status(500).json({ error: 'Database error' });
+            }
+
+            if (!existingTestCase) {
+                db.close();
+                return res.status(404).json({ error: 'Test case not found' });
+            }
+
+            // Delete associated test results first (cascade delete)
+            db.run(
+                'DELETE FROM test_results WHERE test_case_id = ?',
+                [testCaseId],
+                function(err) {
+                    if (err) {
+                        db.close();
+                        console.error('Error deleting test results:', err);
+                        return res.status(500).json({ error: 'Failed to delete associated test results' });
+                    }
+
+                    // Now delete the test case
+                    db.run(
+                        'DELETE FROM test_cases WHERE id = ? AND user_id = ?',
+                        [testCaseId, req.user.id],
+                        function(err) {
+                            db.close();
+                            
+                            if (err) {
+                                console.error('Database error:', err);
+                                return res.status(500).json({ error: 'Failed to delete test case' });
+                            }
+
+                            if (this.changes === 0) {
+                                return res.status(404).json({ error: 'Test case not found' });
+                            }
+
+                            res.json({
+                                message: 'Test case deleted successfully',
+                                deletedId: parseInt(testCaseId)
+                            });
+                        }
+                    );
+                }
+            );
+        }
+    );
+});
+
 // Execute a test case
 router.post('/execute/:id', authenticateToken, async (req, res) => {
     try {
@@ -382,6 +517,155 @@ router.get('/results', authenticateToken, (req, res) => {
         }
 
         res.json({ results });
+    });
+});
+
+// Get a specific test result
+router.get('/results/:id', authenticateToken, (req, res) => {
+    const db = getDatabase();
+
+    db.get(`
+        SELECT tr.*, tc.name as test_case_name, tc.url as test_case_url 
+        FROM test_results tr 
+        JOIN test_cases tc ON tr.test_case_id = tc.id 
+        WHERE tr.id = ? AND tc.user_id = ?
+    `, [req.params.id, req.user.id], (err, result) => {
+        db.close();
+        
+        if (err) {
+            return res.status(500).json({ error: 'Database error' });
+        }
+
+        if (!result) {
+            return res.status(404).json({ error: 'Test result not found' });
+        }
+
+        res.json({ result });
+    });
+});
+
+// Update a test result
+router.put('/results/:id', authenticateToken, (req, res) => {
+    try {
+        const resultId = req.params.id;
+        const { status, execution_time, error_message, screenshot_path, report_path } = req.body;
+
+        if (!status) {
+            return res.status(400).json({ error: 'Status is required' });
+        }
+
+        // Validate status values
+        const allowedStatuses = ['success', 'failed', 'pending', 'skipped'];
+        if (!allowedStatuses.includes(status)) {
+            return res.status(400).json({ error: 'Invalid status. Must be one of: ' + allowedStatuses.join(', ') });
+        }
+
+        // Input validation and sanitization
+        const sanitizedStatus = status.trim();
+        const sanitizedErrorMessage = error_message ? error_message.trim().replace(/[<>]/g, '') : null;
+        const sanitizedScreenshotPath = screenshot_path ? screenshot_path.trim().replace(/[<>'"]/g, '') : null;
+        const sanitizedReportPath = report_path ? report_path.trim().replace(/[<>'"]/g, '') : null;
+        const validExecutionTime = execution_time && !isNaN(execution_time) ? parseInt(execution_time) : null;
+
+        const db = getDatabase();
+
+        // First check if the test result exists and belongs to the user (via test case)
+        db.get(`
+            SELECT tr.id 
+            FROM test_results tr 
+            JOIN test_cases tc ON tr.test_case_id = tc.id 
+            WHERE tr.id = ? AND tc.user_id = ?
+        `, [resultId, req.user.id], (err, existingResult) => {
+            if (err) {
+                db.close();
+                return res.status(500).json({ error: 'Database error' });
+            }
+
+            if (!existingResult) {
+                db.close();
+                return res.status(404).json({ error: 'Test result not found' });
+            }
+
+            // Update the test result
+            db.run(
+                'UPDATE test_results SET status = ?, execution_time = ?, error_message = ?, screenshot_path = ?, report_path = ? WHERE id = ?',
+                [sanitizedStatus, validExecutionTime, sanitizedErrorMessage, sanitizedScreenshotPath, sanitizedReportPath, resultId],
+                function(err) {
+                    db.close();
+                    
+                    if (err) {
+                        console.error('Database error:', err);
+                        return res.status(500).json({ error: 'Failed to update test result' });
+                    }
+
+                    if (this.changes === 0) {
+                        return res.status(404).json({ error: 'Test result not found' });
+                    }
+
+                    res.json({
+                        message: 'Test result updated successfully',
+                        result: {
+                            id: parseInt(resultId),
+                            status: sanitizedStatus,
+                            execution_time: validExecutionTime,
+                            error_message: sanitizedErrorMessage,
+                            screenshot_path: sanitizedScreenshotPath,
+                            report_path: sanitizedReportPath
+                        }
+                    });
+                }
+            );
+        });
+    } catch (error) {
+        console.error('Update test result error:', error);
+        res.status(500).json({ error: 'Server error' });
+    }
+});
+
+// Delete a test result
+router.delete('/results/:id', authenticateToken, (req, res) => {
+    const resultId = req.params.id;
+    const db = getDatabase();
+
+    // First check if the test result exists and belongs to the user (via test case)
+    db.get(`
+        SELECT tr.id 
+        FROM test_results tr 
+        JOIN test_cases tc ON tr.test_case_id = tc.id 
+        WHERE tr.id = ? AND tc.user_id = ?
+    `, [resultId, req.user.id], (err, existingResult) => {
+        if (err) {
+            db.close();
+            return res.status(500).json({ error: 'Database error' });
+        }
+
+        if (!existingResult) {
+            db.close();
+            return res.status(404).json({ error: 'Test result not found' });
+        }
+
+        // Delete the test result
+        db.run(
+            'DELETE FROM test_results WHERE id = ?',
+            [resultId],
+            function(err) {
+                db.close();
+                
+                if (err) {
+                    console.error('Database error:', err);
+                    return res.status(500).json({ error: 'Failed to delete test result' });
+                }
+
+                if (this.changes === 0) {
+                    return res.status(404).json({ error: 'Test result not found' });
+                }
+
+                res.json({
+                    message: 'Test result deleted successfully',
+                    deletedId: parseInt(resultId)
+                });
+            }
+        );
     });
 });
 
