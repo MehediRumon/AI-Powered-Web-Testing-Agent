@@ -196,6 +196,11 @@ class PlaywrightTestService {
 
     async handleClickAction(elementSelector, options = {}) {
         try {
+            // Check if page is available
+            if (!this.page) {
+                throw new Error('Browser page is not initialized. Call initialize() first.');
+            }
+
             // For text-based selectors, use special handling with retry logic
             if (elementSelector.startsWith('text=')) {
                 await this.handleTextBasedClick(elementSelector, options);
@@ -223,25 +228,37 @@ class PlaywrightTestService {
     }
 
     async handleTextBasedClick(textSelector, options = {}) {
+        // Check if page is available
+        if (!this.page) {
+            throw new Error('Browser page is not initialized. Call initialize() first.');
+        }
+
         const maxRetries = 3;
         const retryDelay = 2000;
+        const text = textSelector.replace('text=', '');
         
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
                 // Wait for any text matching the selector to be present
                 await this.page.waitForFunction(
-                    (selector) => {
-                        const text = selector.replace('text=', '');
-                        return Array.from(document.querySelectorAll('*')).some(el => 
-                            el.textContent && el.textContent.trim().includes(text)
-                        );
+                    (searchText) => {
+                        return Array.from(document.querySelectorAll('*')).some(el => {
+                            const textContent = el.textContent && el.textContent.trim();
+                            return textContent && (
+                                textContent === searchText || 
+                                textContent.includes(searchText) ||
+                                el.value === searchText ||
+                                el.getAttribute('value') === searchText
+                            );
+                        });
                     },
-                    textSelector,
+                    text,
                     { timeout: options.timeout || 60000 }
                 );
 
-                // Try to click the element
+                // Try to click the element using the original selector first
                 await this.page.click(textSelector, { ...options, timeout: 10000 });
+                console.log(`Successfully clicked using original selector: ${textSelector}`);
                 return; // Success, exit retry loop
                 
             } catch (error) {
@@ -249,30 +266,85 @@ class PlaywrightTestService {
                 
                 if (attempt === maxRetries) {
                     // On final attempt, try alternative selectors
-                    const text = textSelector.replace('text=', '');
                     const alternatives = [
                         `button:has-text("${text}")`,
                         `a:has-text("${text}")`,
                         `[role="button"]:has-text("${text}")`,
-                        `*:text("${text}")`
+                        `input[type="submit"]:has-text("${text}")`,
+                        `input[type="button"]:has-text("${text}")`,
+                        `[onclick]:has-text("${text}")`,
+                        `button >> text="${text}"`,
+                        `text="${text}"`,
+                        `button:text("${text}")`,
+                        `a:text("${text}")`,
+                        `[role="button"]:text("${text}")`,
+                        // Additional alternatives for exact matches
+                        `button:text-is("${text}")`,
+                        `a:text-is("${text}")`,
+                        `input[value="${text}"]`,
+                        `button[title="${text}"]`,
+                        `a[title="${text}"]`
                     ];
                     
+                    let lastError = error;
                     for (const altSelector of alternatives) {
                         try {
-                            await this.page.click(altSelector, { ...options, timeout: 5000 });
-                            console.log(`Successfully clicked using alternative selector: ${altSelector}`);
-                            return;
+                            // First check if element exists and is visible
+                            const element = await this.page.locator(altSelector).first();
+                            const isVisible = await element.isVisible().catch(() => false);
+                            
+                            if (isVisible) {
+                                await element.click({ ...options, timeout: 5000 });
+                                console.log(`Successfully clicked using alternative selector: ${altSelector}`);
+                                return;
+                            }
                         } catch (altError) {
+                            lastError = altError;
                             continue;
                         }
                     }
                     
-                    throw new Error(`All click attempts failed for text selector '${textSelector}' after ${maxRetries} retries`);
+                    // Final fallback: try to find any clickable element containing the text
+                    try {
+                        await this.page.locator(`text="${text}"`).first().click({ ...options, timeout: 5000 });
+                        console.log(`Successfully clicked using fallback text locator`);
+                        return;
+                    } catch (fallbackError) {
+                        // Throw comprehensive error message
+                        throw new Error(`All click attempts failed for text selector '${textSelector}' after ${maxRetries} retries. Last error: ${lastError.message}. Available elements: ${await this.getAvailableElements(text)}`);
+                    }
                 }
                 
                 // Wait before retry
                 await this.page.waitForTimeout(retryDelay);
             }
+        }
+    }
+
+    async getAvailableElements(searchText) {
+        try {
+            const elements = await this.page.evaluate((text) => {
+                const found = [];
+                const allElements = document.querySelectorAll('*');
+                for (const el of allElements) {
+                    const textContent = el.textContent && el.textContent.trim();
+                    const value = el.value;
+                    if ((textContent && textContent.includes(text)) || (value && value.includes(text))) {
+                        found.push({
+                            tagName: el.tagName.toLowerCase(),
+                            text: textContent ? textContent.substring(0, 50) : '',
+                            value: value || '',
+                            id: el.id || '',
+                            className: el.className || ''
+                        });
+                    }
+                }
+                return found.slice(0, 5); // Limit to first 5 matches
+            }, searchText);
+            
+            return elements.map(el => `${el.tagName}(id: ${el.id}, class: ${el.className}, text: "${el.text}", value: "${el.value}")`).join(', ');
+        } catch (error) {
+            return 'Unable to retrieve available elements';
         }
     }
 
