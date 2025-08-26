@@ -190,20 +190,6 @@ class PlaywrightTestService {
                 console.warn(`Unknown action type: ${type}`);
         }
     }
-            case 'assert_text':
-                const element = await this.page.locator(selector);
-                const text = await element.textContent();
-                if (!text.includes(value)) {
-                    throw new Error(`Expected text "${value}" not found in element "${selector}"`);
-                }
-                break;
-            case 'assert_visible':
-                await this.page.waitForSelector(selector, { state: 'visible', ...options });
-                break;
-            default:
-                console.warn(`Unknown action type: ${type}`);
-        }
-    }
 
     async close() {
         try {
