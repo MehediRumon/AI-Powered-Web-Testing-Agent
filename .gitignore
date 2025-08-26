@@ -14,3 +14,5 @@ build/
 coverage/
 .nyc_output/
 .playwright/
+tests/*test.js
+!tests/test.js

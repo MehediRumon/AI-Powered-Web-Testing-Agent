@@ -71,8 +71,20 @@ This document outlines the enhanced features implemented to better align with th
   - Better error reporting and debugging
   - Enhanced screenshot capture on failures
 
-### 6. Enhanced Action Support
-- **Feature**: Support for new action types matching problem statement
+### 6. Enhanced Action Support and Timeout Handling
+- **Feature**: Support for new action types and improved timeout handling
+- **Implementation**: Enhanced `src/services/playwright.js` with better error handling
+- **New Features**:
+  - Configurable timeout per action (default 60 seconds, 90 seconds for text selectors)
+  - Retry logic for text-based click actions
+  - Alternative selector fallback strategies  
+  - Enhanced error messages for better debugging
+  - Improved waiting strategies for dynamic content
+- **Timeout Improvements**:
+  - Extended default timeouts to handle slow-loading elements
+  - Automatic retry with different selector strategies
+  - Better handling of `text=` selectors with fallbacks
+  - Reduced false failures due to timing issues
 - **Implementation**: Extended `executeAction` method in Playwright service
 - **New Actions**:
   - `navigate`: Direct navigation actions

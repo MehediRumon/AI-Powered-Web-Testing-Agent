@@ -137,11 +137,18 @@ Example output:
             // Parse actions
             if (lowerLine.includes('click')) {
                 const selector = this.extractSelector(line, 'button');
-                actions.push({
+                const action = {
                     type: 'click',
                     selector: selector,
                     description: line.trim()
-                });
+                };
+                
+                // Add longer timeout for text-based selectors
+                if (selector.startsWith('text=')) {
+                    action.timeout = 90000; // 90 seconds for text-based clicks
+                }
+                
+                actions.push(action);
             } else if (lowerLine.includes('type') || lowerLine.includes('enter') || lowerLine.includes('input')) {
                 const value = this.extractValue(line);
                 const selector = this.extractSelector(line, 'input');

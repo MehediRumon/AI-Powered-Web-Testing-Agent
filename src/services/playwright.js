@@ -125,10 +125,13 @@ class PlaywrightTestService {
     }
 
     async executeAction(action) {
-        const { type, selector, locator, value, options = {}, expectedUrl } = action;
+        const { type, selector, locator, value, options = {}, expectedUrl, timeout = 60000 } = action;
         
         // Support both 'selector' and 'locator' for compatibility
         const elementSelector = locator || selector;
+        
+        // Set default timeout for operations that might need more time
+        const actionOptions = { timeout, ...options };
 
         switch (type) {
             case 'navigate':
@@ -141,10 +144,10 @@ class PlaywrightTestService {
             case 'input':
             case 'fill':
             case 'type':
-                await this.page.fill(elementSelector, value, options);
+                await this.page.fill(elementSelector, value, actionOptions);
                 break;
             case 'click':
-                await this.page.click(elementSelector, options);
+                await this.handleClickAction(elementSelector, actionOptions);
                 break;
             case 'verify':
                 if (expectedUrl) {
@@ -155,16 +158,16 @@ class PlaywrightTestService {
                 }
                 break;
             case 'select':
-                await this.page.selectOption(elementSelector, value, options);
+                await this.page.selectOption(elementSelector, value, actionOptions);
                 break;
             case 'check':
-                await this.page.check(elementSelector, options);
+                await this.page.check(elementSelector, actionOptions);
                 break;
             case 'uncheck':
-                await this.page.uncheck(elementSelector, options);
+                await this.page.uncheck(elementSelector, actionOptions);
                 break;
             case 'hover':
-                await this.page.hover(elementSelector, options);
+                await this.page.hover(elementSelector, actionOptions);
                 break;
             case 'scroll':
                 await this.page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
@@ -173,14 +176,14 @@ class PlaywrightTestService {
                 if (value) {
                     await this.page.waitForTimeout(parseInt(value));
                 } else if (elementSelector) {
-                    await this.page.waitForSelector(elementSelector, options);
+                    await this.page.waitForSelector(elementSelector, actionOptions);
                 }
                 break;
             case 'assert_visible':
-                await this.page.waitForSelector(elementSelector, { state: 'visible', ...options });
+                await this.page.waitForSelector(elementSelector, { state: 'visible', ...actionOptions });
                 break;
             case 'assert_text':
-                const element = await this.page.waitForSelector(elementSelector, options);
+                const element = await this.page.waitForSelector(elementSelector, actionOptions);
                 const text = await element.textContent();
                 if (!text.includes(value)) {
                     throw new Error(`Expected element to contain text '${value}' but got '${text}'`);
@@ -188,6 +191,88 @@ class PlaywrightTestService {
                 break;
             default:
                 console.warn(`Unknown action type: ${type}`);
+        }
+    }
+
+    async handleClickAction(elementSelector, options = {}) {
+        try {
+            // For text-based selectors, use special handling with retry logic
+            if (elementSelector.startsWith('text=')) {
+                await this.handleTextBasedClick(elementSelector, options);
+                return;
+            }
+            
+            // For regular selectors, wait for element to be visible and enabled
+            await this.page.waitForSelector(elementSelector, { 
+                state: 'visible', 
+                timeout: options.timeout || 60000 
+            });
+
+            // Check if element is enabled before clicking
+            const isEnabled = await this.page.isEnabled(elementSelector);
+            if (!isEnabled) {
+                throw new Error(`Element '${elementSelector}' is not enabled for clicking`);
+            }
+
+            // Perform the click
+            await this.page.click(elementSelector, options);
+        } catch (error) {
+            // Enhanced error message for better debugging
+            throw new Error(`Failed to click element '${elementSelector}': ${error.message}`);
+        }
+    }
+
+    async handleTextBasedClick(textSelector, options = {}) {
+        const maxRetries = 3;
+        const retryDelay = 2000;
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                // Wait for any text matching the selector to be present
+                await this.page.waitForFunction(
+                    (selector) => {
+                        const text = selector.replace('text=', '');
+                        return Array.from(document.querySelectorAll('*')).some(el => 
+                            el.textContent && el.textContent.trim().includes(text)
+                        );
+                    },
+                    textSelector,
+                    { timeout: options.timeout || 60000 }
+                );
+
+                // Try to click the element
+                await this.page.click(textSelector, { ...options, timeout: 10000 });
+                return; // Success, exit retry loop
+                
+            } catch (error) {
+                console.warn(`Click attempt ${attempt}/${maxRetries} failed for ${textSelector}: ${error.message}`);
+                
+                if (attempt === maxRetries) {
+                    // On final attempt, try alternative selectors
+                    const text = textSelector.replace('text=', '');
+                    const alternatives = [
+                        `button:has-text("${text}")`,
+                        `a:has-text("${text}")`,
+                        `[role="button"]:has-text("${text}")`,
+                        `*:text("${text}")`
+                    ];
+                    
+                    for (const altSelector of alternatives) {
+                        try {
+                            await this.page.click(altSelector, { ...options, timeout: 5000 });
+                            console.log(`Successfully clicked using alternative selector: ${altSelector}`);
+                            return;
+                        } catch (altError) {
+                            continue;
+                        }
+                    }
+                    
+                    throw new Error(`All click attempts failed for text selector '${textSelector}' after ${maxRetries} retries`);
+                }
+                
+                // Wait before retry
+                await this.page.waitForTimeout(retryDelay);
+            }
         }
     }
 
