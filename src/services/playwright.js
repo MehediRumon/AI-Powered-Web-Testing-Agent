@@ -544,7 +544,9 @@ class PlaywrightTestService {
             await this.addVisualIndicator(selector);
             
             // Update the indicator text based on action type
-            await this.page.evaluate((sel, action, dur) => {
+            // Wrap multiple arguments in an object to avoid "too many arguments" error
+            await this.page.evaluate((args) => {
+                const { sel, action, dur } = args;
                 let element = null;
                 
                 // Handle different selector types (same logic as addVisualIndicator)
@@ -583,7 +585,7 @@ class PlaywrightTestService {
                         }
                     }, dur);
                 }
-            }, selector, actionType, duration);
+            }, { sel: selector, action: actionType, dur: duration });
             
             // Remove indicator after duration
             setTimeout(async () => {
