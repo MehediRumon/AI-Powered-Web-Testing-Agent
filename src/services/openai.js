@@ -32,7 +32,7 @@ Return a JSON object with this exact structure:
     "url": "Target URL",
     "actions": [
       {
-        "type": "navigate|input|click|verify|wait|assert_visible|assert_text|fill",
+        "type": "navigate|input|click|verify|wait|assert_visible|assert_text",
         "locator": "CSS_selector_or_element_identifier", 
         "value": "input_value_if_needed",
         "description": "Human readable step description",
@@ -44,38 +44,32 @@ Return a JSON object with this exact structure:
 
 Supported action types:
 - navigate: Navigate to a URL
-- input/fill: Fill text into input fields 
+- input: Fill text into input fields 
 - click: Click buttons, links, or elements
 - verify: Check if redirected to expected URL
 - wait: Wait for elements or time
 - assert_visible: Assert element is visible
 - assert_text: Assert text content
 
-Use specific locators for common login scenarios:
-- For email fields: input[type="email"], input[name*="email"], input[id*="email"], input[placeholder*="email"]
-- For "User Email" fields: input[name*="Email"], input[id*="Email"], input[placeholder*="Email"]
-- For password fields: input[type="password"], input[name*="password"], input[id*="password"]
-- For login buttons: button:has-text("Log in"), button:has-text("Login"), input[type="submit"], button[type="submit"]
+Use specific locators:
+- For input fields: input[name="username"], #password, input[type="email"]
+- For buttons: button:contains('Login'), .login-btn, [type="submit"]
+- For links: a[href*="/login"], .nav-link
 - For generic elements: .class-name, #element-id
 
-Special handling for login flows:
-- Always start with navigation to the URL if provided
-- Use 'fill' type for entering text in input fields
-- Target email fields with multiple selector options for reliability
-- Use descriptive button selectors that match common login text
-
-Example input: "Navigate to https://ums-2.osl.team/Account/Login, Enter rumon.onnorokom@gmail.com in User Email field, Enter password in Password field, Click Log in button"
+Example input: "Navigate to /login, enter username admin, enter password password123, click Login, verify redirected to dashboard"
 Example output: 
 {
   "testCase": {
-    "name": "UMS Login Test",
-    "description": "Test login functionality for UMS system",
-    "url": "https://ums-2.osl.team/Account/Login",
+    "name": "Login Test",
+    "description": "Verify login functionality",
+    "url": "/login",
     "actions": [
-      {"type": "navigate", "locator": "", "value": "https://ums-2.osl.team/Account/Login", "description": "Navigate to login page"},
-      {"type": "fill", "locator": "input[type=\"email\"], input[name*=\"email\"], input[id*=\"email\"], input[name*=\"Email\"], input[id*=\"Email\"]", "value": "rumon.onnorokom@gmail.com", "description": "Enter email address in User Email field"},
-      {"type": "fill", "locator": "input[type=\"password\"], input[name*=\"password\"], input[id*=\"password\"]", "value": "your_password_here", "description": "Enter password in Password field"},
-      {"type": "click", "locator": "button:has-text(\"Log in\"), button:has-text(\"Login\"), input[type=\"submit\"], button[type=\"submit\"]", "description": "Click the Log in button"}
+      {"type": "navigate", "locator": "", "value": "/login", "description": "Navigate to login page"},
+      {"type": "input", "locator": "input[name='username']", "value": "admin", "description": "Enter username"},
+      {"type": "input", "locator": "input[name='password']", "value": "password123", "description": "Enter password"},
+      {"type": "click", "locator": "button:contains('Login')", "description": "Click login button"},
+      {"type": "verify", "locator": "", "expectedUrl": "/dashboard", "description": "Verify redirected to dashboard"}
     ]
   }
 }`
@@ -131,14 +125,6 @@ Example output:
             const urlMatch = line.match(/https?:\/\/[^\s]+/);
             if (urlMatch) {
                 testUrl = urlMatch[0];
-                // Add navigation action if URL is mentioned in the instructions
-                if (lowerLine.includes('navigate') || lowerLine.includes('go to') || lowerLine.includes('visit')) {
-                    actions.push({
-                        type: 'navigate',
-                        value: urlMatch[0],
-                        description: `Navigate to ${urlMatch[0]}`
-                    });
-                }
                 continue;
             }
 
@@ -148,37 +134,15 @@ Example output:
                 continue;
             }
 
-            // Parse actions with enhanced logic for login scenarios
-            if (lowerLine.includes('click') || (lowerLine.includes('log in') && lowerLine.includes('button'))) {
+            // Parse actions
+            if (lowerLine.includes('click')) {
                 const selector = this.extractSelector(line, 'button');
                 actions.push({
                     type: 'click',
                     selector: selector,
                     description: line.trim()
                 });
-            } else if (lowerLine.includes('enter') && (lowerLine.includes('email') || lowerLine.includes('user email'))) {
-                const value = this.extractValue(line);
-                const selector = this.extractSelector(line, 'input');
-                actions.push({
-                    type: 'fill',
-                    selector: selector,
-                    value: value,
-                    description: line.trim()
-                });
-            } else if (lowerLine.includes('enter') && lowerLine.includes('password')) {
-                let value = this.extractValue(line);
-                const selector = this.extractSelector(line, 'input');
-                // If no specific password was extracted, use placeholder
-                if (!value || value === 'password' || value === 'Password' || value.toLowerCase().includes('valid')) {
-                    value = 'your_password_here';
-                }
-                actions.push({
-                    type: 'fill',
-                    selector: selector,
-                    value: value,
-                    description: line.trim()
-                });
-            } else if (lowerLine.includes('type') || lowerLine.includes('input') || lowerLine.includes('fill')) {
+            } else if (lowerLine.includes('type') || lowerLine.includes('enter') || lowerLine.includes('input')) {
                 const value = this.extractValue(line);
                 const selector = this.extractSelector(line, 'input');
                 actions.push({
@@ -218,15 +182,6 @@ Example output:
             }
         }
 
-        // If URL found but no navigation action added, add it at the beginning
-        if (testUrl && !actions.some(action => action.type === 'navigate')) {
-            actions.unshift({
-                type: 'navigate',
-                value: testUrl,
-                description: `Navigate to ${testUrl}`
-            });
-        }
-
         return {
             testCase: {
                 name: testName,
@@ -238,47 +193,24 @@ Example output:
     }
 
     extractSelector(line, defaultSelector) {
-        // Enhanced field type detection for specific field names FIRST
-        const lowerLine = line.toLowerCase();
-        
-        // Email field detection (prioritized)
-        if (lowerLine.includes('user email') || lowerLine.includes('email address') || lowerLine.includes('email field')) {
-            return 'input[type="email"], input[name*="email"], input[id*="email"], input[placeholder*="email"], input[name*="Email"], input[id*="Email"]';
-        } else if (lowerLine.includes('email')) {
-            return 'input[type="email"], input[name*="email"], input[id*="email"]';
-        }
-        
-        // Password field detection (prioritized)
-        if (lowerLine.includes('password') && lowerLine.includes('field')) {
-            return 'input[type="password"], input[name*="password"], input[id*="password"]';
-        }
-        
-        // Login button detection (prioritized)
-        if (lowerLine.includes('log in') || (lowerLine.includes('login') && lowerLine.includes('button'))) {
-            return 'button:has-text("Log in"), button:has-text("Login"), button:has-text("Sign in"), input[type="submit"], button[type="submit"]';
-        }
-
-        // Try to extract quoted text as selector (secondary)
+        // Try to extract quoted text as selector
         const quotedMatch = line.match(/["']([^"']+)["']/);
         if (quotedMatch) {
             const text = quotedMatch[1];
-            // If it contains CSS selector characters, use as-is
             if (text.includes('#') || text.includes('.') || text.includes('[')) {
                 return text; // Looks like a CSS selector
-            }
-            // If it's an email address, don't use it as selector
-            if (!text.includes('@') && !lowerLine.includes('field')) {
-                // Convert text to Playwright text locator for non-email, non-field text
+            } else {
+                // Convert text to Playwright text locator
                 return `text=${text}`;
             }
         }
-        
-        // Generic detection
-        if (lowerLine.includes('button')) {
+
+        // Try to extract element type
+        if (line.toLowerCase().includes('button')) {
             return 'button, .btn, [type="submit"]';
-        } else if (lowerLine.includes('link')) {
+        } else if (line.toLowerCase().includes('link')) {
             return 'a';
-        } else if (lowerLine.includes('input') || lowerLine.includes('field')) {
+        } else if (line.toLowerCase().includes('input') || line.toLowerCase().includes('field')) {
             return 'input, textarea';
         }
 
@@ -286,43 +218,10 @@ Example output:
     }
 
     extractValue(line) {
-        // Try to extract email address first (anywhere in the line)
-        const emailMatch = line.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
-        if (emailMatch) {
-            return emailMatch[0];
-        }
-
-        // Try to extract quoted value (including values in quotes) but skip field names
+        // Try to extract quoted value
         const quotedMatch = line.match(/["']([^"']+)["']/);
         if (quotedMatch) {
-            const quotedValue = quotedMatch[1];
-            // If the quoted value is just a field name, ignore it
-            if (quotedValue.toLowerCase() === 'user email' || 
-                quotedValue.toLowerCase() === 'password' || 
-                quotedValue.toLowerCase() === 'email') {
-                // Fall through to other extraction methods
-            } else {
-                return quotedValue;
-            }
-        }
-
-        // Try to extract value after common phrases for login scenarios
-        const lowerLine = line.toLowerCase();
-        
-        // For password entries - if it's a generic request, return placeholder
-        if (lowerLine.includes('password') && lowerLine.includes('field') && 
-            !lowerLine.match(/enter\s+[^\s]+\s+in.*password/)) {
-            return 'your_password_here'; // Placeholder for password when no specific value given
-        }
-
-        // For specific password values mentioned
-        if (lowerLine.includes('password')) {
-            const passwordMatch = line.match(/enter\s+["']?([^"'\s]+)["']?\s+.*password/i);
-            if (passwordMatch && passwordMatch[1] && 
-                passwordMatch[1].toLowerCase() !== 'password' &&
-                !passwordMatch[1].toLowerCase().includes('valid')) {
-                return passwordMatch[1];
-            }
+            return quotedMatch[1];
         }
 
         // Try to extract value after "with" or ":" 
