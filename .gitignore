@@ -13,4 +13,4 @@ dist/
 build/
 coverage/
 .nyc_output/
-.playwright/UMS_LOGIN_IMPLEMENTATION.md\n*.tmp\ntest-*.js\ndebug-*.js\ndemonstration.js\ncheck-stored.js
+.playwright/
