@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Powered Web Testing Agent</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            color: #333;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            text-align: center;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        .auth-section {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin: 2rem auto;
+            max-width: 400px;
+        }
+
+        .main-content {
+            display: none;
+            padding: 2rem 0;
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+
+        .card-header {
+            background: #f8f9fa;
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid #eee;
+            font-weight: 600;
+        }
+
+        .card-body {
+            padding: 1.5rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        input, textarea, select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #5a6fd8;
+        }
+
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-success {
+            background: #28a745;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .status {
+            padding: 0.75rem;
+            border-radius: 4px;
+            margin: 1rem 0;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #cce7ff;
+            color: #004085;
+            border: 1px solid #b3d7ff;
+        }
+
+        .test-case {
+            border: 1px solid #eee;
+            border-radius: 4px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .test-result {
+            border-left: 4px solid #28a745;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            background: #f8f9fa;
+        }
+
+        .test-result.failed {
+            border-left-color: #dc3545;
+        }
+
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #eee;
+        }
+
+        .tab {
+            padding: 1rem;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            border-bottom-color: #667eea;
+            color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 1.5rem;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .file-upload {
+            border: 2px dashed #ddd;
+            border-radius: 4px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .file-upload:hover {
+            border-color: #667eea;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 2s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="container">
+            <h1>🤖 AI-Powered Web Testing Agent</h1>
+            <p>Automate your web testing with Playwright and AI</p>
+        </div>
+    </div>
+
+    <!-- Authentication Section -->
+    <div id="authSection" class="auth-section">
+        <div class="tabs">
+            <div class="tab active" onclick="switchAuthTab('login')">Login</div>
+            <div class="tab" onclick="switchAuthTab('register')">Register</div>
+        </div>
+        
+        <!-- Login Form -->
+        <div id="loginTab" class="tab-content active">
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="loginUsername">Username</label>
+                    <input type="text" id="loginUsername" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Password</label>
+                    <input type="password" id="loginPassword" name="password" required>
+                </div>
+                <button type="submit">Login</button>
+            </form>
+        </div>
+
+        <!-- Register Form -->
+        <div id="registerTab" class="tab-content">
+            <form id="registerForm">
+                <div class="form-group">
+                    <label for="registerUsername">Username</label>
+                    <input type="text" id="registerUsername" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="registerEmail">Email</label>
+                    <input type="email" id="registerEmail" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="registerPassword">Password</label>
+                    <input type="password" id="registerPassword" name="password" required>
+                </div>
+                <button type="submit">Register</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div id="mainContent" class="main-content">
+        <div class="container">
+            <!-- Browser Status -->
+            <div class="card">
+                <div class="card-header">Browser Status</div>
+                <div class="card-body">
+                    <div id="browserStatus">Checking browser installation...</div>
+                    <button id="installBrowsersBtn" class="btn-secondary hidden" onclick="installBrowsers()">Install Browsers</button>
+                </div>
+            </div>
+
+            <div class="grid">
+                <!-- Test Creation -->
+                <div class="card">
+                    <div class="card-header">Create Test Case</div>
+                    <div class="card-body">
+                        <div class="tabs">
+                            <div class="tab active" onclick="switchTestTab('manual')">Manual</div>
+                            <div class="tab" onclick="switchTestTab('ai')">AI Assistant</div>
+                            <div class="tab" onclick="switchTestTab('upload')">Upload</div>
+                        </div>
+
+                        <!-- Manual Test Creation -->
+                        <div id="manualTestTab" class="tab-content active">
+                            <form id="createTestForm">
+                                <div class="form-group">
+                                    <label for="testName">Test Name</label>
+                                    <input type="text" id="testName" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="testUrl">URL</label>
+                                    <input type="url" id="testUrl" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="testDescription">Description</label>
+                                    <textarea id="testDescription" rows="3"></textarea>
+                                </div>
+                                <button type="submit">Create Test</button>
+                            </form>
+                        </div>
+
+                        <!-- AI Assistant -->
+                        <div id="aiTestTab" class="tab-content">
+                            <div class="form-group">
+                                <label for="aiInstructions">Describe your test in natural language</label>
+                                <textarea id="aiInstructions" rows="4" placeholder="Example: Go to https://example.com, click the login button, enter username 'test@example.com', enter password 'password123', and click submit"></textarea>
+                            </div>
+                            <button onclick="parseWithAI()">Parse with AI</button>
+                            <button onclick="generateFromURL()" class="btn-secondary">Generate from URL</button>
+                            
+                            <div id="aiResult" class="hidden">
+                                <h4>Parsed Test Case:</h4>
+                                <pre id="aiParsedResult"></pre>
+                                <button onclick="saveAIParsedTest()" class="btn-success">Save Test Case</button>
+                            </div>
+                        </div>
+
+                        <!-- File Upload -->
+                        <div id="uploadTestTab" class="tab-content">
+                            <div class="file-upload" onclick="document.getElementById('fileInput').click()">
+                                <p>Click to upload CSV/Excel file with test cases</p>
+                                <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" style="display: none;" onchange="uploadFile()">
+                            </div>
+                            <div id="uploadResult"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Test Execution -->
+                <div class="card">
+                    <div class="card-header">Test Execution</div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label for="browserType">Browser Type</label>
+                            <select id="browserType">
+                                <option value="chromium">Chromium</option>
+                                <option value="firefox">Firefox</option>
+                                <option value="webkit">WebKit</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="headlessMode" checked> Headless Mode
+                            </label>
+                        </div>
+                        <button onclick="executeAllTests()" class="btn-success">Run All Tests</button>
+                        <button onclick="loadTestCases()" class="btn-secondary">Refresh Test Cases</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Test Cases List -->
+            <div class="card">
+                <div class="card-header">Test Cases</div>
+                <div class="card-body">
+                    <div id="testCasesList">Loading test cases...</div>
+                </div>
+            </div>
+
+            <!-- Test Results -->
+            <div class="card">
+                <div class="card-header">Test Results</div>
+                <div class="card-body">
+                    <button onclick="loadTestResults()" class="btn-secondary">Refresh Results</button>
+                    <button onclick="generateReport('html')" class="btn-success">Generate HTML Report</button>
+                    <button onclick="generateReport('pdf')" class="btn-success">Generate PDF Report</button>
+                    <div id="testResultsList">Loading test results...</div>
+                </div>
+            </div>
+
+            <!-- Logout -->
+            <div class="card">
+                <div class="card-body" style="text-align: center;">
+                    <button onclick="logout()" class="btn-danger">Logout</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let authToken = localStorage.getItem('authToken');
+        let currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        let lastParsedTest = null;
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            if (authToken) {
+                showMainContent();
+                checkBrowserStatus();
+                loadTestCases();
+                loadTestResults();
+            } else {
+                showAuthSection();
+            }
+        });
+
+        // Authentication functions
+        function switchAuthTab(tab) {
+            document.querySelectorAll('.auth-section .tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.auth-section .tab-content').forEach(t => t.classList.remove('active'));
+            
+            if (tab === 'login') {
+                document.querySelector('.auth-section .tab:first-child').classList.add('active');
+                document.getElementById('loginTab').classList.add('active');
+            } else {
+                document.querySelector('.auth-section .tab:last-child').classList.add('active');
+                document.getElementById('registerTab').classList.add('active');
+            }
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    authToken = result.token;
+                    currentUser = result.user;
+                    localStorage.setItem('authToken', authToken);
+                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    showMainContent();
+                    checkBrowserStatus();
+                    loadTestCases();
+                    loadTestResults();
+                } else {
+                    showStatus(result.error, 'error');
+                }
+            } catch (error) {
+                showStatus('Login failed: ' + error.message, 'error');
+            }
+        });
+
+        document.getElementById('registerForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+
+            try {
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    authToken = result.token;
+                    currentUser = result.user;
+                    localStorage.setItem('authToken', authToken);
+                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    showMainContent();
+                    checkBrowserStatus();
+                    loadTestCases();
+                    loadTestResults();
+                } else {
+                    showStatus(result.error, 'error');
+                }
+            } catch (error) {
+                showStatus('Registration failed: ' + error.message, 'error');
+            }
+        });
+
+        function logout() {
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('currentUser');
+            authToken = null;
+            currentUser = {};
+            showAuthSection();
+        }
+
+        function showAuthSection() {
+            document.getElementById('authSection').style.display = 'block';
+            document.getElementById('mainContent').style.display = 'none';
+        }
+
+        function showMainContent() {
+            document.getElementById('authSection').style.display = 'none';
+            document.getElementById('mainContent').style.display = 'block';
+        }
+
+        // Utility functions
+        function showStatus(message, type) {
+            const statusDiv = document.createElement('div');
+            statusDiv.className = `status ${type}`;
+            statusDiv.textContent = message;
+            
+            // Insert at the top of auth section or main content
+            const container = authToken ? document.querySelector('.container') : document.getElementById('authSection');
+            container.insertBefore(statusDiv, container.firstChild);
+            
+            setTimeout(() => statusDiv.remove(), 5000);
+        }
+
+        function switchTestTab(tab) {
+            document.querySelectorAll('.card .tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.card .tab-content').forEach(t => t.classList.remove('active'));
+            
+            document.querySelector(`[onclick="switchTestTab('${tab}')"]`).classList.add('active');
+            document.getElementById(`${tab}TestTab`).classList.add('active');
+        }
+
+        // API call helper
+        async function apiCall(url, options = {}) {
+            const defaultOptions = {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${authToken}`
+                }
+            };
+
+            return fetch(url, { ...defaultOptions, ...options });
+        }
+
+        // Browser status check
+        async function checkBrowserStatus() {
+            try {
+                const response = await apiCall('/api/test/browser-status');
+                const result = await response.json();
+                
+                const statusDiv = document.getElementById('browserStatus');
+                const installBtn = document.getElementById('installBrowsersBtn');
+                
+                if (result.status === 'installed') {
+                    statusDiv.innerHTML = `<div class="status success">${result.message}</div>`;
+                    installBtn.classList.add('hidden');
+                } else {
+                    statusDiv.innerHTML = `<div class="status error">${result.message}</div>`;
+                    installBtn.classList.remove('hidden');
+                }
+            } catch (error) {
+                document.getElementById('browserStatus').innerHTML = 
+                    `<div class="status error">Failed to check browser status</div>`;
+            }
+        }
+
+        async function installBrowsers() {
+            showStatus('Browser installation started. This may take a few minutes...', 'info');
+            // Note: Actual installation would need to be done server-side or manually
+            showStatus('Please run "npm run install-browsers" in your terminal to install Playwright browsers.', 'info');
+        }
+
+        // Test creation
+        document.getElementById('createTestForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+
+            try {
+                const response = await apiCall('/api/test/cases', {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showStatus('Test case created successfully', 'success');
+                    e.target.reset();
+                    loadTestCases();
+                } else {
+                    showStatus(result.error, 'error');
+                }
+            } catch (error) {
+                showStatus('Failed to create test case: ' + error.message, 'error');
+            }
+        });
+
+        // AI parsing functions
+        async function parseWithAI() {
+            const instructions = document.getElementById('aiInstructions').value;
+            if (!instructions) {
+                showStatus('Please enter test instructions', 'error');
+                return;
+            }
+
+            try {
+                const response = await apiCall('/api/test/ai/parse', {
+                    method: 'POST',
+                    body: JSON.stringify({ instructions })
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    lastParsedTest = result.parsed.testCase;
+                    document.getElementById('aiParsedResult').textContent = JSON.stringify(lastParsedTest, null, 2);
+                    document.getElementById('aiResult').classList.remove('hidden');
+                } else {
+                    showStatus(result.error, 'error');
+                }
+            } catch (error) {
+                showStatus('AI parsing failed: ' + error.message, 'error');
+            }
+        }
+
+        async function generateFromURL() {
+            const url = prompt('Enter URL to generate test for:');
+            if (!url) return;
+
+            try {
+                const response = await apiCall('/api/test/ai/generate-from-url', {
+                    method: 'POST',
+                    body: JSON.stringify({ url })
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    lastParsedTest = result.testCase;
+                    document.getElementById('aiParsedResult').textContent = JSON.stringify(lastParsedTest, null, 2);
+                    document.getElementById('aiResult').classList.remove('hidden');
+                } else {
+                    showStatus(result.error, 'error');
+                }
+            } catch (error) {
+                showStatus('AI generation failed: ' + error.message, 'error');
+            }
+        }
+
+        async function saveAIParsedTest() {
+            if (!lastParsedTest) return;
+
+            try {
+                const response = await apiCall('/api/test/cases', {
+                    method: 'POST',
+                    body: JSON.stringify(lastParsedTest)
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showStatus('AI-parsed test case saved successfully', 'success');
+                    document.getElementById('aiResult').classList.add('hidden');
+                    document.getElementById('aiInstructions').value = '';
+                    loadTestCases();
+                } else {
+                    showStatus(result.error, 'error');
+                }
+            } catch (error) {
+                showStatus('Failed to save test case: ' + error.message, 'error');
+            }
+        }
+
+        // File upload
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/api/upload/test-cases', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: formData
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showStatus(`Successfully imported ${result.testCases.length} test cases`, 'success');
+                    document.getElementById('uploadResult').innerHTML = 
+                        `<div class="status success">Imported ${result.testCases.length} test cases from ${result.file.originalName}</div>`;
+                    loadTestCases();
+                } else {
+                    showStatus(result.error, 'error');
+                }
+            } catch (error) {
+                showStatus('File upload failed: ' + error.message, 'error');
+            }
+        }
+
+        // Test execution
+        async function executeTest(testId) {
+            const browserType = document.getElementById('browserType').value;
+            const headless = document.getElementById('headlessMode').checked;
+
+            try {
+                showStatus('Executing test...', 'info');
+                
+                const response = await apiCall(`/api/test/execute/${testId}`, {
+                    method: 'POST',
+                    body: JSON.stringify({ browserType, headless })
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showStatus(`Test executed: ${result.result.status}`, 
+                        result.result.status === 'success' ? 'success' : 'error');
+                    loadTestResults();
+                } else {
+                    showStatus(result.error, 'error');
+                }
+            } catch (error) {
+                showStatus('Test execution failed: ' + error.message, 'error');
+            }
+        }
+
+        async function executeAllTests() {
+            const browserType = document.getElementById('browserType').value;
+            const headless = document.getElementById('headlessMode').checked;
+
+            try {
+                showStatus('Executing all tests...', 'info');
+                
+                const response = await apiCall('/api/test/execute-all', {
+                    method: 'POST',
+                    body: JSON.stringify({ browserType, headless })
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showStatus(`Batch execution completed: ${result.summary.passed}/${result.summary.total} passed`, 'success');
+                    loadTestResults();
+                } else {
+                    showStatus(result.error, 'error');
+                }
+            } catch (error) {
+                showStatus('Batch execution failed: ' + error.message, 'error');
+            }
+        }
+
+        // Load test cases
+        async function loadTestCases() {
+            try {
+                const response = await apiCall('/api/test/cases');
+                const result = await response.json();
+                
+                if (response.ok) {
+                    const testCasesList = document.getElementById('testCasesList');
+                    
+                    if (result.testCases.length === 0) {
+                        testCasesList.innerHTML = '<p>No test cases found. Create your first test case above.</p>';
+                        return;
+                    }
+
+                    testCasesList.innerHTML = result.testCases.map(testCase => `
+                        <div class="test-case">
+                            <h4>${testCase.name}</h4>
+                            <p><strong>URL:</strong> ${testCase.url}</p>
+                            <p><strong>Description:</strong> ${testCase.description || 'No description'}</p>
+                            <p><strong>Actions:</strong> ${testCase.actions.length} step(s)</p>
+                            <button onclick="executeTest(${testCase.id})" class="btn-success">Run Test</button>
+                        </div>
+                    `).join('');
+                } else {
+                    document.getElementById('testCasesList').innerHTML = 
+                        `<div class="status error">Failed to load test cases</div>`;
+                }
+            } catch (error) {
+                document.getElementById('testCasesList').innerHTML = 
+                    `<div class="status error">Failed to load test cases: ${error.message}</div>`;
+            }
+        }
+
+        // Load test results
+        async function loadTestResults() {
+            try {
+                const response = await apiCall('/api/test/results');
+                const result = await response.json();
+                
+                if (response.ok) {
+                    const testResultsList = document.getElementById('testResultsList');
+                    
+                    if (result.results.length === 0) {
+                        testResultsList.innerHTML = '<p>No test results found. Run some tests to see results here.</p>';
+                        return;
+                    }
+
+                    testResultsList.innerHTML = result.results.map(testResult => `
+                        <div class="test-result ${testResult.status === 'failed' ? 'failed' : ''}">
+                            <h4>${testResult.test_case_name}</h4>
+                            <p><strong>Status:</strong> ${testResult.status.toUpperCase()}</p>
+                            <p><strong>Execution Time:</strong> ${testResult.execution_time}ms</p>
+                            <p><strong>Executed:</strong> ${new Date(testResult.executed_at).toLocaleString()}</p>
+                            ${testResult.error_message ? `<p><strong>Error:</strong> ${testResult.error_message}</p>` : ''}
+                            ${testResult.screenshot_path ? `<p><strong>Screenshot:</strong> Available</p>` : ''}
+                        </div>
+                    `).join('');
+                } else {
+                    document.getElementById('testResultsList').innerHTML = 
+                        `<div class="status error">Failed to load test results</div>`;
+                }
+            } catch (error) {
+                document.getElementById('testResultsList').innerHTML = 
+                    `<div class="status error">Failed to load test results: ${error.message}</div>`;
+            }
+        }
+
+        // Report generation
+        async function generateReport(type) {
+            try {
+                showStatus(`Generating ${type.toUpperCase()} report...`, 'info');
+                
+                const response = await apiCall(`/api/reports/generate/${type}`, {
+                    method: 'POST',
+                    body: JSON.stringify({}) // Include all results
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showStatus(`${type.toUpperCase()} report generated successfully`, 'success');
+                    
+                    // Create download link
+                    const link = document.createElement('a');
+                    link.href = `/api/reports/download/${result.report.filename}`;
+                    link.download = result.report.filename;
+                    link.textContent = `Download ${result.report.filename}`;
+                    link.style.display = 'block';
+                    link.style.margin = '10px 0';
+                    
+                    document.getElementById('testResultsList').prepend(link);
+                } else {
+                    showStatus(result.error, 'error');
+                }
+            } catch (error) {
+                showStatus(`Report generation failed: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>
