@@ -64,9 +64,28 @@ class PlaywrightTestService {
 
             // Execute actions if provided
             if (testCase.actions && Array.isArray(testCase.actions)) {
-                for (const action of testCase.actions) {
-                    await this.executeAction(action);
-                    result.steps.push(`Executed: ${action.type} on ${action.selector || action.target}`);
+                for (let i = 0; i < testCase.actions.length; i++) {
+                    const action = testCase.actions[i];
+                    try {
+                        await this.executeAction(action);
+                        const stepDescription = action.description || `${action.type} on ${action.locator || action.selector || action.target}`;
+                        result.steps.push({
+                            stepNumber: i + 1,
+                            description: stepDescription,
+                            status: 'success',
+                            timestamp: new Date().toISOString()
+                        });
+                    } catch (stepError) {
+                        const stepDescription = action.description || `${action.type} on ${action.locator || action.selector || action.target}`;
+                        result.steps.push({
+                            stepNumber: i + 1,
+                            description: stepDescription,
+                            status: 'failed',
+                            error: stepError.message,
+                            timestamp: new Date().toISOString()
+                        });
+                        throw stepError; // Re-throw to handle in outer catch
+                    }
                 }
             }
 
@@ -106,27 +125,46 @@ class PlaywrightTestService {
     }
 
     async executeAction(action) {
-        const { type, selector, value, options = {} } = action;
+        const { type, selector, locator, value, options = {}, expectedUrl } = action;
+        
+        // Support both 'selector' and 'locator' for compatibility
+        const elementSelector = locator || selector;
 
         switch (type) {
-            case 'click':
-                await this.page.click(selector, options);
+            case 'navigate':
+                if (value) {
+                    await this.page.goto(value, { waitUntil: 'networkidle' });
+                } else if (elementSelector) {
+                    await this.page.goto(elementSelector, { waitUntil: 'networkidle' });
+                }
                 break;
+            case 'input':
             case 'fill':
             case 'type':
-                await this.page.fill(selector, value, options);
+                await this.page.fill(elementSelector, value, options);
+                break;
+            case 'click':
+                await this.page.click(elementSelector, options);
+                break;
+            case 'verify':
+                if (expectedUrl) {
+                    const currentUrl = this.page.url();
+                    if (!currentUrl.includes(expectedUrl)) {
+                        throw new Error(`Expected URL to contain '${expectedUrl}' but got '${currentUrl}'`);
+                    }
+                }
                 break;
             case 'select':
-                await this.page.selectOption(selector, value, options);
+                await this.page.selectOption(elementSelector, value, options);
                 break;
             case 'check':
-                await this.page.check(selector, options);
+                await this.page.check(elementSelector, options);
                 break;
             case 'uncheck':
-                await this.page.uncheck(selector, options);
+                await this.page.uncheck(elementSelector, options);
                 break;
             case 'hover':
-                await this.page.hover(selector, options);
+                await this.page.hover(elementSelector, options);
                 break;
             case 'scroll':
                 await this.page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
@@ -134,10 +172,24 @@ class PlaywrightTestService {
             case 'wait':
                 if (value) {
                     await this.page.waitForTimeout(parseInt(value));
-                } else if (selector) {
-                    await this.page.waitForSelector(selector, options);
+                } else if (elementSelector) {
+                    await this.page.waitForSelector(elementSelector, options);
                 }
                 break;
+            case 'assert_visible':
+                await this.page.waitForSelector(elementSelector, { state: 'visible', ...options });
+                break;
+            case 'assert_text':
+                const element = await this.page.waitForSelector(elementSelector, options);
+                const text = await element.textContent();
+                if (!text.includes(value)) {
+                    throw new Error(`Expected element to contain text '${value}' but got '${text}'`);
+                }
+                break;
+            default:
+                console.warn(`Unknown action type: ${type}`);
+        }
+    }
             case 'assert_text':
                 const element = await this.page.locator(selector);
                 const text = await element.textContent();

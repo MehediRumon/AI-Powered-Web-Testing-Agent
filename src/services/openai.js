@@ -24,7 +24,7 @@ class OpenAIService {
                             role: 'system',
                             content: `You are a web testing expert. Parse natural language test instructions and convert them to structured test actions. 
                             
-Return a JSON object with this structure:
+Return a JSON object with this exact structure:
 {
   "testCase": {
     "name": "Test name",
@@ -32,24 +32,47 @@ Return a JSON object with this structure:
     "url": "Target URL",
     "actions": [
       {
-        "type": "action_type",
-        "selector": "CSS_selector", 
-        "value": "input_value",
-        "description": "What this step does"
+        "type": "navigate|input|click|verify|wait|assert_visible|assert_text",
+        "locator": "CSS_selector_or_element_identifier", 
+        "value": "input_value_if_needed",
+        "description": "Human readable step description",
+        "expectedUrl": "expected_url_for_verify_actions"
       }
     ]
   }
 }
 
-Supported action types: click, fill, select, check, uncheck, hover, scroll, wait, assert_text, assert_visible
+Supported action types:
+- navigate: Navigate to a URL
+- input: Fill text into input fields 
+- click: Click buttons, links, or elements
+- verify: Check if redirected to expected URL
+- wait: Wait for elements or time
+- assert_visible: Assert element is visible
+- assert_text: Assert text content
 
-Use specific CSS selectors when possible. For common elements use:
-- Buttons: button, .btn, [type="submit"]
-- Input fields: input[name="fieldname"], #id
-- Links: a[href*="keyword"]
-- Text: h1, h2, p, span containing specific text
+Use specific locators:
+- For input fields: input[name="username"], #password, input[type="email"]
+- For buttons: button:contains('Login'), .login-btn, [type="submit"]
+- For links: a[href*="/login"], .nav-link
+- For generic elements: .class-name, #element-id
 
-Example: "Click the login button" becomes {"type": "click", "selector": "button:contains('Login'), .login-btn", "description": "Click login button"}`
+Example input: "Navigate to /login, enter username admin, enter password password123, click Login, verify redirected to dashboard"
+Example output: 
+{
+  "testCase": {
+    "name": "Login Test",
+    "description": "Verify login functionality",
+    "url": "/login",
+    "actions": [
+      {"type": "navigate", "locator": "", "value": "/login", "description": "Navigate to login page"},
+      {"type": "input", "locator": "input[name='username']", "value": "admin", "description": "Enter username"},
+      {"type": "input", "locator": "input[name='password']", "value": "password123", "description": "Enter password"},
+      {"type": "click", "locator": "button:contains('Login')", "description": "Click login button"},
+      {"type": "verify", "locator": "", "expectedUrl": "/dashboard", "description": "Verify redirected to dashboard"}
+    ]
+  }
+}`
                         },
                         {
                             role: 'user',

@@ -23,14 +23,14 @@ const storage = multer.diskStorage({
 const upload = multer({
     storage: storage,
     fileFilter: (req, file, cb) => {
-        // Accept CSV and Excel files
-        const allowedTypes = ['.csv', '.xlsx', '.xls'];
+        // Accept CSV, Excel, and JSON files
+        const allowedTypes = ['.csv', '.xlsx', '.xls', '.json'];
         const fileExt = path.extname(file.originalname).toLowerCase();
         
         if (allowedTypes.includes(fileExt)) {
             cb(null, true);
         } else {
-            cb(new Error('Only CSV and Excel files are allowed'), false);
+            cb(new Error('Only CSV, Excel, and JSON files are allowed'), false);
         }
     },
     limits: {
@@ -68,6 +68,9 @@ router.post('/test-cases', authenticateToken, upload.single('file'), async (req,
         } else if (fileExt === '.xlsx' || fileExt === '.xls') {
             // Parse Excel file
             testCases = await parseExcelFile(filePath);
+        } else if (fileExt === '.json') {
+            // Parse JSON file
+            testCases = await parseJsonFile(filePath);
         }
 
         // Save test cases to database
@@ -170,6 +173,47 @@ function parseExcelFile(filePath) {
                 actions: row.actions ? JSON.parse(row.actions) : []
             }));
 
+            resolve(testCases);
+        } catch (error) {
+            reject(error);
+        }
+    });
+}
+
+// Helper function to parse JSON file
+function parseJsonFile(filePath) {
+    return new Promise((resolve, reject) => {
+        try {
+            const fileContent = fs.readFileSync(filePath, 'utf8');
+            const data = JSON.parse(fileContent);
+            
+            let testCases = [];
+            
+            // Handle both array of test cases and single test case
+            if (Array.isArray(data)) {
+                testCases = data.map(item => ({
+                    name: item.name || item.testName || item.title,
+                    description: item.description || item.desc,
+                    url: item.url || item.baseUrl || item.website,
+                    actions: item.actions || item.steps || []
+                }));
+            } else if (data.testCases && Array.isArray(data.testCases)) {
+                testCases = data.testCases.map(item => ({
+                    name: item.name || item.testName || item.title,
+                    description: item.description || item.desc,
+                    url: item.url || item.baseUrl || item.website,
+                    actions: item.actions || item.steps || []
+                }));
+            } else {
+                // Single test case
+                testCases = [{
+                    name: data.name || data.testName || data.title,
+                    description: data.description || data.desc,
+                    url: data.url || data.baseUrl || data.website,
+                    actions: data.actions || data.steps || []
+                }];
+            }
+            
             resolve(testCases);
         } catch (error) {
             reject(error);
