@@ -135,7 +135,7 @@ Example output:
                 continue;
             }
 
-            // Parse actions
+            // Parse actions - order matters for proper detection
             if (lowerLine.includes('click')) {
                 const selector = this.extractSelector(line, 'button');
                 const action = {
@@ -157,20 +157,22 @@ Example output:
                 }
                 
                 actions.push(action);
-            } else if (lowerLine.includes('type') || lowerLine.includes('enter') || lowerLine.includes('input')) {
-                const value = this.extractValue(line);
-                const selector = this.extractSelector(line, 'input');
-                actions.push({
-                    type: 'fill',
-                    selector: selector,
-                    value: value,
-                    description: line.trim()
-                });
-            } else if (lowerLine.includes('select')) {
+            } else if (lowerLine.includes('select') || lowerLine.includes('choose') || lowerLine.includes('pick')) {
+                // Prioritize select actions for dropdown-related instructions
                 const value = this.extractValue(line);
                 const selector = this.extractSelector(line, 'select');
                 actions.push({
                     type: 'select',
+                    selector: selector,
+                    value: value,
+                    description: line.trim()
+                });
+            } else if (this.isInputAction(lowerLine)) {
+                // More specific detection for input/fill actions
+                const value = this.extractValue(line);
+                const selector = this.extractSelector(line, 'input');
+                actions.push({
+                    type: 'fill',
                     selector: selector,
                     value: value,
                     description: line.trim()
@@ -208,6 +210,13 @@ Example output:
     }
 
     extractSelector(line, defaultSelector) {
+        const lowerLine = line.toLowerCase();
+        
+        // Special handling for dropdown/select actions
+        if (defaultSelector === 'select' && this.isDropdownAction(lowerLine)) {
+            return this.extractDropdownSelector(line);
+        }
+        
         // Find all quoted strings in the line
         const allQuotedMatches = line.match(/["']([^"']+)["']/g);
         
@@ -237,7 +246,6 @@ Example output:
         }
 
         // Try to extract text content for element type keywords
-        const lowerLine = line.toLowerCase();
         if (lowerLine.includes('button') || lowerLine.includes('link')) {
             // Extract text from patterns like "click Login Button" or "click Home link"
             const textPattern = /click\s+(.+?)\s+(button|link)/i;
@@ -272,6 +280,61 @@ Example output:
         }
 
         return defaultSelector;
+    }
+
+    // Extract dropdown selector with better context awareness
+    extractDropdownSelector(line) {
+        const lowerLine = line.toLowerCase();
+        
+        // Look for common dropdown name patterns
+        const dropdownPatterns = [
+            /(?:from|in)\s+(?:the\s+)?(.+?)\s+(?:dropdown|select)/gi,
+            /(?:dropdown|select).*?(?:id|name)[:\s]+['"]?([^'"]+)['"]?/gi,
+            /(?:id|name)[:\s]+['"]?([^'"]+)['"]?.*?(?:dropdown|select)/gi
+        ];
+        
+        for (const pattern of dropdownPatterns) {
+            // Use exec() to get capture groups properly
+            pattern.lastIndex = 0; // Reset regex state
+            const match = pattern.exec(line);
+            if (match && match[1]) {
+                const fieldName = match[1].trim().toLowerCase();
+                
+                // Convert common field name patterns to selectors
+                if (fieldName.includes('mobile banking') || fieldName.includes('mobilebanking')) {
+                    return '#MobileBankingType';
+                }
+                
+                // Other common patterns
+                if (fieldName.includes('country')) {
+                    return '#country, select[name="country"]';
+                }
+                if (fieldName.includes('state') || fieldName.includes('province')) {
+                    return '#state, #province, select[name="state"], select[name="province"]';
+                }
+                
+                // Generate selector from field name
+                const cleanName = fieldName.replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '');
+                if (cleanName) {
+                    // Try common ID patterns
+                    return `#${cleanName}, #${cleanName}Type, select[name="${cleanName}"], select[name="${cleanName}Type"]`;
+                }
+            }
+        }
+        
+        // Look for explicit ID or name in the instruction
+        const idMatch = line.match(/(?:id|ID)[\s=:]+['"]?([^'"\s]+)['"]?/);
+        if (idMatch) {
+            return `#${idMatch[1]}`;
+        }
+        
+        const nameMatch = line.match(/(?:name)[\s=:]+['"]?([^'"\s]+)['"]?/);
+        if (nameMatch) {
+            return `select[name="${nameMatch[1]}"]`;
+        }
+        
+        // Default dropdown selector - prioritize ID-based common patterns
+        return 'select, [role="combobox"], [role="listbox"]';
     }
 
     extractValue(line) {
@@ -373,6 +436,41 @@ Example output:
         }
         
         return false;
+    }
+
+    // Helper method to identify input/fill actions more precisely
+    isInputAction(lowerLine) {
+        // More specific patterns for input actions to avoid false positives
+        return (
+            lowerLine.includes('type in') ||
+            lowerLine.includes('type into') ||
+            lowerLine.includes('enter') ||
+            lowerLine.includes('input') ||
+            lowerLine.includes('fill') ||
+            (lowerLine.includes('type') && (
+                lowerLine.includes('field') ||
+                lowerLine.includes('box') ||
+                lowerLine.includes('username') ||
+                lowerLine.includes('password') ||
+                lowerLine.includes('email') ||
+                lowerLine.includes('search')
+            ))
+        ) && !this.isDropdownAction(lowerLine);
+    }
+
+    // Helper method to identify dropdown-related actions
+    isDropdownAction(lowerLine) {
+        return (
+            lowerLine.includes('dropdown') ||
+            lowerLine.includes('select') ||
+            lowerLine.includes('choose') ||
+            lowerLine.includes('pick') ||
+            (lowerLine.includes('from') && (
+                lowerLine.includes('dropdown') ||
+                lowerLine.includes('select') ||
+                lowerLine.includes('option')
+            ))
+        );
     }
 
     async generateTestFromURL(url) {
