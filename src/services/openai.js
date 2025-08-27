@@ -36,7 +36,8 @@ Return a JSON object with this exact structure:
         "locator": "CSS_selector_or_element_identifier", 
         "value": "input_value_if_needed",
         "description": "Human readable step description",
-        "expectedUrl": "expected_url_for_verify_actions"
+        "expectedUrl": "expected_url_for_verify_actions",
+        "elementType": "button|link|generic (optional, for click actions to specify element type preference)"
       }
     ]
   }

@@ -130,13 +130,13 @@ class PlaywrightTestService {
     }
 
     async executeAction(action) {
-        const { type, selector, locator, value, options = {}, expectedUrl, timeout = 60000 } = action;
+        const { type, selector, locator, value, options = {}, expectedUrl, timeout = 60000, elementType } = action;
         
         // Support both 'selector' and 'locator' for compatibility
         const elementSelector = locator || selector;
         
         // Set default timeout for operations that might need more time
-        const actionOptions = { timeout, ...options };
+        const actionOptions = { timeout, elementType, ...options };
 
         switch (type) {
             case 'navigate':
@@ -278,26 +278,8 @@ class PlaywrightTestService {
                 console.warn(`Click attempt ${attempt}/${maxRetries} failed for ${textSelector}: ${error.message}`);
                 
                 if (attempt === maxRetries) {
-                    // On final attempt, try alternative selectors
-                    const alternatives = [
-                        `button:has-text("${text}")`,
-                        `a:has-text("${text}")`,
-                        `[role="button"]:has-text("${text}")`,
-                        `input[type="submit"]:has-text("${text}")`,
-                        `input[type="button"]:has-text("${text}")`,
-                        `[onclick]:has-text("${text}")`,
-                        `button >> text="${text}"`,
-                        `text="${text}"`,
-                        `button:text("${text}")`,
-                        `a:text("${text}")`,
-                        `[role="button"]:text("${text}")`,
-                        // Additional alternatives for exact matches
-                        `button:text-is("${text}")`,
-                        `a:text-is("${text}")`,
-                        `input[value="${text}"]`,
-                        `button[title="${text}"]`,
-                        `a[title="${text}"]`
-                    ];
+                    // On final attempt, try alternative selectors with element type prioritization
+                    const alternatives = this.buildAlternativeSelectors(text, options.elementType);
                     
                     let lastError = error;
                     for (const altSelector of alternatives) {
@@ -332,6 +314,61 @@ class PlaywrightTestService {
                 await this.page.waitForTimeout(retryDelay);
             }
         }
+    }
+
+    // Build alternative selectors with element type prioritization
+    buildAlternativeSelectors(text, elementType) {
+        // Define selectors grouped by element type
+        const selectorsByType = {
+            button: [
+                `button:has-text("${text}")`,
+                `button:text("${text}")`,
+                `button:text-is("${text}")`,
+                `button >> text="${text}"`,
+                `input[type="submit"]:has-text("${text}")`,
+                `input[type="button"]:has-text("${text}")`,
+                `[role="button"]:has-text("${text}")`,
+                `[role="button"]:text("${text}")`,
+                `input[value="${text}"]`,
+                `button[title="${text}"]`
+            ],
+            link: [
+                `a:has-text("${text}")`,
+                `a:text("${text}")`,
+                `a:text-is("${text}")`,
+                `a >> text="${text}"`,
+                `[role="link"]:has-text("${text}")`,
+                `[role="link"]:text("${text}")`,
+                `a[title="${text}"]`
+            ],
+            generic: [
+                `[onclick]:has-text("${text}")`,
+                `text="${text}"`,
+                `*:has-text("${text}")`,
+                `[title="${text}"]`
+            ]
+        };
+
+        // If elementType is specified, prioritize that type
+        if (elementType) {
+            const normalizedType = elementType.toLowerCase();
+            if (selectorsByType[normalizedType]) {
+                // Put the specified type first, then add others
+                return [
+                    ...selectorsByType[normalizedType],
+                    ...selectorsByType.button.filter(s => !selectorsByType[normalizedType].includes(s)),
+                    ...selectorsByType.link.filter(s => !selectorsByType[normalizedType].includes(s)),
+                    ...selectorsByType.generic
+                ];
+            }
+        }
+
+        // Default order: button, link, then generic
+        return [
+            ...selectorsByType.button,
+            ...selectorsByType.link,
+            ...selectorsByType.generic
+        ];
     }
 
     async getAvailableElements(searchText) {
