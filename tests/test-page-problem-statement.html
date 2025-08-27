@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mobile Banking Type Test Page - Problem Statement Example</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background-color: #f5f5f5;
+        }
+        .container { 
+            margin: 20px 0; 
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-control {
+            width: 100%;
+            max-width: 300px;
+            padding: 8px; 
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .form-control.valid {
+            border-color: #28a745;
+        }
+        .result { 
+            margin-top: 20px; 
+            padding: 15px; 
+            background-color: #f0f0f0; 
+            border-radius: 5px; 
+            border-left: 4px solid #007bff;
+        }
+        .success {
+            background-color: #d4edda;
+            border-left-color: #28a745;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border-left-color: #dc3545;
+            color: #721c24;
+        }
+        .code-example {
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 10px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .test-description {
+            background-color: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Mobile Banking Type Test - Problem Statement Example</h1>
+    
+    <div class="container">
+        <h3>Exact HTML Element from Problem Statement</h3>
+        
+        <div class="form-group">
+            <label for="MobileBankingType">Mobile Banking Type:</label>
+            <!-- This is the exact HTML element from the problem statement -->
+            <select class="form-control valid" data-val="true" data-val-number="The field Mobile Banking Type must be a number." id="MobileBankingType" name="MobileBankingType" onchange="showResult('Selected Mobile Banking Type: ' + this.options[this.selectedIndex].text + ' (value: ' + this.value + ')')">
+                <option value="">Select Type</option>
+                <option value="20">Nagad</option>
+            </select>
+        </div>
+    </div>
+    
+    <!-- Result display -->
+    <div id="result" class="result">No interactions yet</div>
+    
+    <div class="container">
+        <h3>Natural Language Test Description</h3>
+        
+        <div class="test-description">
+            <h4>📝 Primary Test Description:</h4>
+            <p><strong>"Select 'Nagad' from the Mobile Banking Type dropdown and verify that the selection shows 'Nagad' as the display text and '20' as the underlying value."</strong></p>
+        </div>
+
+        <h4>Alternative Natural Language Descriptions:</h4>
+        
+        <div class="test-description">
+            <strong>Basic Selection:</strong><br>
+            "Select 'Nagad' from the Mobile Banking Type dropdown"
+        </div>
+        
+        <div class="test-description">
+            <strong>Value-based Selection:</strong><br>
+            "Choose option with value '20' from the MobileBankingType dropdown"
+        </div>
+        
+        <div class="test-description">
+            <strong>ID-based Selection:</strong><br>
+            "Select 'Nagad' from dropdown with ID 'MobileBankingType'"
+        </div>
+        
+        <div class="test-description">
+            <strong>Verification Test:</strong><br>
+            "Verify that 'Nagad' is selected in the Mobile Banking Type dropdown"
+        </div>
+        
+        <div class="test-description">
+            <strong>Complete Workflow:</strong><br>
+            "Navigate to the payment form, select 'Nagad' from Mobile Banking Type dropdown, verify the selection shows 'Nagad' as text and '20' as value, and confirm the form validation passes"
+        </div>
+    </div>
+    
+    <div class="container">
+        <h3>Generated Test Actions</h3>
+        <p>These natural language descriptions would generate the following structured test actions:</p>
+        
+        <h4>1. Basic Selection Action:</h4>
+        <div class="code-example">
+{
+  "type": "select",
+  "locator": "#MobileBankingType",
+  "value": "Nagad",
+  "description": "Select Nagad from Mobile Banking Type dropdown"
+}
+        </div>
+        
+        <h4>2. Selection by Value:</h4>
+        <div class="code-example">
+{
+  "type": "select",
+  "locator": "#MobileBankingType", 
+  "value": "20",
+  "description": "Select option with value '20'"
+}
+        </div>
+        
+        <h4>3. Verification Action:</h4>
+        <div class="code-example">
+{
+  "type": "assert_text",
+  "locator": "#MobileBankingType option:selected",
+  "value": "Nagad",
+  "description": "Verify Nagad is selected"
+}
+        </div>
+        
+        <h4>4. Complete Test Case:</h4>
+        <div class="code-example">
+{
+  "testCase": {
+    "name": "Mobile Banking Type Selection Test",
+    "description": "Test selecting Nagad from Mobile Banking Type dropdown",
+    "url": "https://example.com/payment-form",
+    "actions": [
+      {
+        "type": "select",
+        "locator": "#MobileBankingType",
+        "value": "Nagad",
+        "description": "Select Nagad from Mobile Banking Type dropdown"
+      },
+      {
+        "type": "assert_text",
+        "locator": "#MobileBankingType option:selected",
+        "value": "Nagad", 
+        "description": "Verify Nagad is selected"
+      },
+      {
+        "type": "assert_text",
+        "locator": "#MobileBankingType",
+        "value": "20",
+        "description": "Verify dropdown value is 20"
+      }
+    ]
+  }
+}
+        </div>
+    </div>
+    
+    <div class="container">
+        <h3>Key Testing Considerations</h3>
+        <ul>
+            <li><strong>Value vs Text:</strong> The option has value="20" but displays "Nagad" - tests must handle both</li>
+            <li><strong>Validation:</strong> Element has data-val-number attribute requiring numeric validation</li>
+            <li><strong>Default State:</strong> Initial state shows "Select Type" placeholder</li>
+            <li><strong>Single Option:</strong> Only one selectable option besides default</li>
+            <li><strong>Form Control:</strong> Uses Bootstrap-style form-control class with validation state</li>
+        </ul>
+    </div>
+    
+    <div class="container">
+        <h3>Try the Test Cases</h3>
+        <p>Click the dropdown above to test the selection manually. The system would generate automated tests for these natural language descriptions:</p>
+        
+        <ol>
+            <li><strong>Select "Nagad" from Mobile Banking Type dropdown</strong> - Basic selection test</li>
+            <li><strong>Verify "Nagad" option has value "20"</strong> - Value verification test</li>
+            <li><strong>Reset dropdown to default state</strong> - Reset functionality test</li>
+            <li><strong>Validate form accepts numeric value "20"</strong> - Validation test</li>
+        </ol>
+    </div>
+    
+    <script>
+        function showResult(message) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = message + ' ✅';
+            resultDiv.className = 'result success';
+            
+            // Reset after 5 seconds
+            setTimeout(() => {
+                resultDiv.textContent = 'No interactions yet';
+                resultDiv.className = 'result';
+            }, 5000);
+        }
+
+        // Add error handling for failed selections
+        window.addEventListener('error', function(e) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = 'Error: ' + e.message + ' ❌';
+            resultDiv.className = 'result error';
+        });
+        
+        // Add validation demonstration
+        document.getElementById('MobileBankingType').addEventListener('change', function() {
+            const selectedValue = this.value;
+            const selectedText = this.options[this.selectedIndex].text;
+            
+            // Demonstrate validation check
+            if (selectedValue && isNaN(selectedValue)) {
+                showResult('Validation Error: Value must be a number');
+                return;
+            }
+            
+            if (selectedValue === "20") {
+                showResult(`✅ Valid selection: Text='${selectedText}', Value='${selectedValue}' (passes numeric validation)`);
+            } else if (selectedValue === "") {
+                showResult('Default state: Select Type (no value selected)');
+            }
+        });
+    </script>
+</body>
+</html>
