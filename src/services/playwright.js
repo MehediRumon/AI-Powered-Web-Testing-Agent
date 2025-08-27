@@ -75,6 +75,11 @@ class PlaywrightTestService {
                             status: 'success',
                             timestamp: new Date().toISOString()
                         });
+                        
+                        // Add 5-second delay between interactions (except after the last action)
+                        if (i < testCase.actions.length - 1) {
+                            await this.page.waitForTimeout(5000);
+                        }
                     } catch (stepError) {
                         const stepDescription = action.description || `${action.type} on ${action.locator || action.selector || action.target}`;
                         result.steps.push({
