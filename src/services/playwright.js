@@ -744,66 +744,130 @@ class PlaywrightTestService {
         
         console.log(`Attempting to select '${value}' using selector '${selector}'`);
         
-        try {
-            // First try to select by value (maintains backward compatibility)
-            await this.page.selectOption(selector, value, { timeout: selectTimeout });
-            console.log(`✅ Successfully selected option by value: ${value}`);
-        } catch (valueError) {
-            console.warn(`❌ Selection by value '${value}' failed: ${valueError.message}`);
-            
+        // Smart selection strategy: Prioritize text-based selection for common display text patterns
+        const looksLikeDisplayText = this.isDisplayTextValue(value);
+        
+        if (looksLikeDisplayText) {
+            // For display text values, try label first for better efficiency
             try {
-                // Fallback: try to select by label/text
                 await this.page.selectOption(selector, { label: value }, { timeout: selectTimeout });
-                console.log(`✅ Successfully selected option by label: ${value}`);
+                console.log(`✅ Successfully selected option by label (prioritized): ${value}`);
+                return;
             } catch (labelError) {
-                console.warn(`❌ Selection by label '${value}' failed: ${labelError.message}`);
+                console.warn(`❌ Priority label selection failed: ${labelError.message}`);
+                // Fall back to value-based selection
+                try {
+                    await this.page.selectOption(selector, value, { timeout: selectTimeout });
+                    console.log(`✅ Successfully selected option by value (fallback): ${value}`);
+                    return;
+                } catch (valueError) {
+                    console.warn(`❌ Value-based fallback failed: ${valueError.message}`);
+                    // Continue to additional fallbacks below
+                }
+            }
+        } else {
+            // For technical values, try value first (maintains backward compatibility)
+            try {
+                await this.page.selectOption(selector, value, { timeout: selectTimeout });
+                console.log(`✅ Successfully selected option by value: ${value}`);
+                return;
+            } catch (valueError) {
+                console.warn(`❌ Selection by value '${value}' failed: ${valueError.message}`);
                 
                 try {
-                    // Second fallback: try case-insensitive value match
-                    const lowerValue = value.toLowerCase();
-                    await this.page.selectOption(selector, lowerValue, { timeout: selectTimeout });
-                    console.log(`✅ Successfully selected option by lowercase value: ${lowerValue}`);
-                } catch (caseError) {
-                    console.warn(`❌ Selection by lowercase value '${lowerValue}' failed: ${caseError.message}`);
-                    
-                    try {
-                        // Third fallback: try case-insensitive label match using evaluate
-                        const caseInsensitiveResult = await this.page.evaluate((sel, val) => {
-                            const selectElement = document.querySelector(sel);
-                            if (!selectElement) return { success: false, error: 'Element not found' };
-                            
-                            const options = Array.from(selectElement.querySelectorAll('option'));
-                            const matchingOption = options.find(opt => 
-                                opt.textContent.trim().toLowerCase() === val.toLowerCase()
-                            );
-                            
-                            if (matchingOption) {
-                                selectElement.value = matchingOption.value;
-                                selectElement.dispatchEvent(new Event('change', { bubbles: true }));
-                                return { success: true, matchedText: matchingOption.textContent.trim(), matchedValue: matchingOption.value };
-                            }
-                            
-                            return { success: false, error: 'No case-insensitive text match found' };
-                        }, selector, value);
-                        
-                        if (caseInsensitiveResult.success) {
-                            console.log(`✅ Successfully selected option by case-insensitive text: ${value} → ${caseInsensitiveResult.matchedText} (value: ${caseInsensitiveResult.matchedValue})`);
-                        } else {
-                            throw new Error(caseInsensitiveResult.error);
-                        }
-                    } catch (caseInsensitiveError) {
-                        console.warn(`❌ Case-insensitive text selection failed: ${caseInsensitiveError.message}`);
-                        // Final fallback: provide detailed error information
-                        const availableOptions = await this.getAvailableSelectOptions(selector);
-                        throw new Error(
-                            `Failed to select option '${value}' in dropdown '${selector}'. ` +
-                            `Tried: value='${value}', label='${value}', value='${value.toLowerCase()}', case-insensitive-text='${value}'. ` +
-                            `Available options: ${availableOptions}`
-                        );
-                    }
+                    // Fallback: try to select by label/text
+                    await this.page.selectOption(selector, { label: value }, { timeout: selectTimeout });
+                    console.log(`✅ Successfully selected option by label: ${value}`);
+                    return;
+                } catch (labelError) {
+                    console.warn(`❌ Selection by label '${value}' failed: ${labelError.message}`);
+                    // Continue to additional fallbacks
                 }
             }
         }
+        
+        // Additional fallbacks for both prioritization strategies
+        try {
+            // Second fallback: try case-insensitive value match
+            const lowerValue = value.toLowerCase();
+            await this.page.selectOption(selector, lowerValue, { timeout: selectTimeout });
+            console.log(`✅ Successfully selected option by lowercase value: ${lowerValue}`);
+        } catch (caseError) {
+            console.warn(`❌ Selection by lowercase value '${value.toLowerCase()}' failed: ${caseError.message}`);
+            
+            try {
+                // Third fallback: try case-insensitive label match using evaluate
+                const caseInsensitiveResult = await this.page.evaluate((sel, val) => {
+                    const selectElement = document.querySelector(sel);
+                    if (!selectElement) return { success: false, error: 'Element not found' };
+                    
+                    const options = Array.from(selectElement.querySelectorAll('option'));
+                    const matchingOption = options.find(opt => 
+                        opt.textContent.trim().toLowerCase() === val.toLowerCase()
+                    );
+                    
+                    if (matchingOption) {
+                        selectElement.value = matchingOption.value;
+                        selectElement.dispatchEvent(new Event('change', { bubbles: true }));
+                        return { success: true, matchedText: matchingOption.textContent.trim(), matchedValue: matchingOption.value };
+                    }
+                    
+                    return { success: false, error: 'No case-insensitive text match found' };
+                }, selector, value);
+                
+                if (caseInsensitiveResult.success) {
+                    console.log(`✅ Successfully selected option by case-insensitive text: ${value} → ${caseInsensitiveResult.matchedText} (value: ${caseInsensitiveResult.matchedValue})`);
+                } else {
+                    throw new Error(caseInsensitiveResult.error);
+                }
+            } catch (caseInsensitiveError) {
+                console.warn(`❌ Case-insensitive text selection failed: ${caseInsensitiveError.message}`);
+                // Final fallback: provide detailed error information
+                const availableOptions = await this.getAvailableSelectOptions(selector);
+                throw new Error(
+                    `Failed to select option '${value}' in dropdown '${selector}'. ` +
+                    `Tried: ${looksLikeDisplayText ? 'label (prioritized), value, ' : 'value, label, '}lowercase value, case-insensitive text. ` +
+                    `Available options: ${availableOptions}`
+                );
+            }
+        }
+    }
+
+    // Helper method to detect if a value looks like display text vs technical value
+    isDisplayTextValue(value) {
+        if (!value || typeof value !== 'string') {
+            return false;
+        }
+        
+        // Common patterns that indicate display text rather than technical values
+        const displayTextPatterns = [
+            // Capitalized words (like "Nagad", "Level-01", "Islam") but not all uppercase single words
+            /^[A-Z][a-z]+(?:-[A-Z0-9]+)*$/, // Nagad, Islam, Level-01
+            // Mixed case with spaces (like "Mobile Banking", "Teacher Grade")
+            /^[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+$/,
+            // Level/Grade patterns (like "Level-01", "Grade-A")
+            /^(Level|Grade|Class)-\w+$/i,
+            // Religious/cultural terms (like "Islam", "Christianity")
+            /^(Islam|Christianity|Hinduism|Buddhism|Jewish|Catholic|Protestant)$/i,
+            // Common payment methods (like "Nagad", "bKash", "Rocket")
+            /^(Nagad|bKash|Rocket|PayPal|Visa|MasterCard)$/i
+        ];
+        
+        // Exclude all-uppercase single words (likely technical values like "ACTIVE", "ENABLED")
+        if (/^[A-Z]+$/.test(value) && !value.includes(' ') && !value.includes('-')) {
+            return false;
+        }
+        
+        // If it matches any display text pattern, prioritize label selection
+        const matchesDisplayPattern = displayTextPatterns.some(pattern => pattern.test(value));
+        
+        // Also prioritize label selection if value contains spaces
+        const hasSpaces = value.includes(' ');
+        
+        // Mixed case with both uppercase and lowercase (but not all caps)
+        const hasMixedCase = /[a-z]/.test(value) && /[A-Z]/.test(value) && !/^[A-Z]+$/.test(value);
+        
+        return matchesDisplayPattern || hasSpaces || hasMixedCase;
     }
 
     // Get available options from a select element for debugging
