@@ -250,25 +250,51 @@ class PlaywrightTestService {
         const retryDelay = 2000;
         const text = textSelector.replace('text=', '');
         
+        // Wait for any text matching the selector to be present
+        await this.page.waitForFunction(
+            (searchText) => {
+                return Array.from(document.querySelectorAll('*')).some(el => {
+                    const textContent = el.textContent && el.textContent.trim();
+                    return textContent && (
+                        textContent === searchText || 
+                        textContent.includes(searchText) ||
+                        el.value === searchText ||
+                        el.getAttribute('value') === searchText
+                    );
+                });
+            },
+            text,
+            { timeout: options.timeout || 60000 }
+        );
+
+        // If elementType is specified, use prioritized selectors immediately
+        if (options.elementType) {
+            const alternatives = this.buildAlternativeSelectors(text, options.elementType);
+            
+            for (const altSelector of alternatives) {
+                try {
+                    // First check if element exists and is visible
+                    const element = await this.page.locator(altSelector).first();
+                    const isVisible = await element.isVisible().catch(() => false);
+                    
+                    if (isVisible) {
+                        await element.click({ ...options, timeout: 5000 });
+                        console.log(`Successfully clicked using prioritized selector: ${altSelector}`);
+                        return;
+                    }
+                } catch (error) {
+                    // Continue trying other selectors
+                    continue;
+                }
+            }
+            
+            // If prioritized selectors failed, throw error with available elements info
+            throw new Error(`Failed to click element with type '${options.elementType}' and text '${text}'. Available elements: ${await this.getAvailableElements(text)}`);
+        }
+
+        // If no elementType specified, use original retry logic for backward compatibility
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-                // Wait for any text matching the selector to be present
-                await this.page.waitForFunction(
-                    (searchText) => {
-                        return Array.from(document.querySelectorAll('*')).some(el => {
-                            const textContent = el.textContent && el.textContent.trim();
-                            return textContent && (
-                                textContent === searchText || 
-                                textContent.includes(searchText) ||
-                                el.value === searchText ||
-                                el.getAttribute('value') === searchText
-                            );
-                        });
-                    },
-                    text,
-                    { timeout: options.timeout || 60000 }
-                );
-
                 // Try to click the element using the original selector first
                 await this.page.click(textSelector, { ...options, timeout: 10000 });
                 console.log(`Successfully clicked using original selector: ${textSelector}`);
@@ -278,8 +304,8 @@ class PlaywrightTestService {
                 console.warn(`Click attempt ${attempt}/${maxRetries} failed for ${textSelector}: ${error.message}`);
                 
                 if (attempt === maxRetries) {
-                    // On final attempt, try alternative selectors with element type prioritization
-                    const alternatives = this.buildAlternativeSelectors(text, options.elementType);
+                    // On final attempt, try alternative selectors
+                    const alternatives = this.buildAlternativeSelectors(text);
                     
                     let lastError = error;
                     for (const altSelector of alternatives) {
