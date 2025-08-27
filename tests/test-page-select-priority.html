@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Select Element Test Page</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { margin: 20px 0; }
+        select { margin: 5px; padding: 5px; }
+        .result { margin-top: 20px; padding: 10px; background-color: #f0f0f0; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Select Element Testing Page</h1>
+    
+    <!-- Multiple elements with same text to test elementType prioritization -->
+    <div class="container">
+        <h3>Country Selection Form</h3>
+        
+        <!-- Button with "United States" text -->
+        <button onclick="showResult('Clicked button with United States text')">United States</button>
+        <span>(This is a button element)</span><br><br>
+        
+        <!-- Link with "United States" text -->
+        <a href="#" onclick="showResult('Clicked link with United States text'); return false;">United States</a>
+        <span>(This is a link element)</span><br><br>
+        
+        <!-- Select dropdown with "United States" option -->
+        <label for="country">Country:</label>
+        <select id="country" name="country" onchange="showResult('Selected United States from dropdown')">
+            <option value="">Select a country</option>
+            <option value="us">United States</option>
+            <option value="ca">Canada</option>
+            <option value="uk">United Kingdom</option>
+        </select>
+        <span>(This is a select element)</span><br><br>
+        
+        <!-- Generic div with "United States" text -->
+        <div onclick="showResult('Clicked generic div with United States text')" style="cursor: pointer; color: blue; text-decoration: underline;">United States</div>
+        <span>(This is a generic clickable div)</span>
+    </div>
+    
+    <!-- Result display -->
+    <div id="result" class="result">No interactions yet</div>
+    
+    <div style="margin-top: 30px;">
+        <h3>Test Instructions:</h3>
+        <ol>
+            <li><strong>elementType: "button"</strong> - Should click the button and show "Clicked button with United States text"</li>
+            <li><strong>elementType: "link"</strong> - Should click the link and show "Clicked link with United States text"</li>
+            <li><strong>elementType: "select"</strong> - Should select the option and show "Selected United States from dropdown"</li>
+            <li><strong>elementType: "generic"</strong> - Should click the div and show "Clicked generic div with United States text"</li>
+            <li><strong>No elementType</strong> - Should prioritize button by default</li>
+        </ol>
+        
+        <h3>Example Test Case for Select:</h3>
+        <pre><code>{
+  "type": "click",
+  "selector": "text=United States",
+  "elementType": "select",
+  "description": "Click the United States option in country dropdown"
+}</code></pre>
+    </div>
+    
+    <script>
+        function showResult(message) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = message + ' ✅';
+            resultDiv.style.backgroundColor = '#d4edda';
+            resultDiv.style.color = '#155724';
+            
+            // Reset after 3 seconds
+            setTimeout(() => {
+                resultDiv.textContent = 'No interactions yet';
+                resultDiv.style.backgroundColor = '#f0f0f0';
+                resultDiv.style.color = '#000';
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

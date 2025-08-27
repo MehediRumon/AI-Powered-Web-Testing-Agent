@@ -367,6 +367,18 @@ class PlaywrightTestService {
                 `[role="link"]:text("${text}")`,
                 `a[title="${text}"]`
             ],
+            select: [
+                `select:has-text("${text}")`,
+                `select >> option:has-text("${text}")`,
+                `select option:text("${text}")`,
+                `select option:text-is("${text}")`,
+                `option:has-text("${text}")`,
+                `option:text("${text}")`,
+                `option:text-is("${text}")`,
+                `[role="combobox"]:has-text("${text}")`,
+                `[role="listbox"]:has-text("${text}")`,
+                `select[title="${text}"]`
+            ],
             generic: [
                 `[onclick]:has-text("${text}")`,
                 `text="${text}"`,
@@ -384,15 +396,17 @@ class PlaywrightTestService {
                     ...selectorsByType[normalizedType],
                     ...selectorsByType.button.filter(s => !selectorsByType[normalizedType].includes(s)),
                     ...selectorsByType.link.filter(s => !selectorsByType[normalizedType].includes(s)),
+                    ...selectorsByType.select.filter(s => !selectorsByType[normalizedType].includes(s)),
                     ...selectorsByType.generic
                 ];
             }
         }
 
-        // Default order: button, link, then generic
+        // Default order: button, link, select, then generic
         return [
             ...selectorsByType.button,
             ...selectorsByType.link,
+            ...selectorsByType.select,
             ...selectorsByType.generic
         ];
     }
