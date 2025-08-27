@@ -144,6 +144,13 @@ Example output:
                     description: line.trim()
                 };
                 
+                // Detect element type from the instruction
+                if (lowerLine.includes('button')) {
+                    action.elementType = 'button';
+                } else if (lowerLine.includes('link')) {
+                    action.elementType = 'link';
+                }
+                
                 // Add longer timeout for text-based selectors
                 if (selector.startsWith('text=')) {
                     action.timeout = 90000; // 90 seconds for text-based clicks
@@ -229,12 +236,38 @@ Example output:
             }
         }
 
-        // Try to extract element type
-        if (line.toLowerCase().includes('button')) {
-            return 'button, .btn, [type="submit"]';
-        } else if (line.toLowerCase().includes('link')) {
-            return 'a';
-        } else if (line.toLowerCase().includes('input') || line.toLowerCase().includes('field')) {
+        // Try to extract text content for element type keywords
+        const lowerLine = line.toLowerCase();
+        if (lowerLine.includes('button') || lowerLine.includes('link')) {
+            // Extract text from patterns like "click Login Button" or "click Home link"
+            const textPattern = /click\s+(.+?)\s+(button|link)/i;
+            const match = line.match(textPattern);
+            if (match) {
+                return `text=${match[1].trim()}`;
+            }
+            
+            // Fallback: try to extract any word before "button"/"link"
+            const beforePattern = /(\w+)\s+(button|link)/i;
+            const beforeMatch = line.match(beforePattern);
+            if (beforeMatch) {
+                return `text=${beforeMatch[1]}`;
+            }
+        }
+
+        // For simple patterns like "click Submit" without explicit element type
+        if (lowerLine.startsWith('click ')) {
+            const textAfterClick = line.slice(6).trim(); // Remove "click "
+            if (textAfterClick && !textAfterClick.includes('#') && !textAfterClick.includes('.') && !textAfterClick.includes('[')) {
+                return `text=${textAfterClick}`;
+            }
+        }
+
+        // If no text can be extracted and it's an element type, return generic text-based fallback
+        if (lowerLine.includes('button')) {
+            return defaultSelector === 'button' ? 'button, .btn, [type="submit"]' : defaultSelector;
+        } else if (lowerLine.includes('link')) {
+            return defaultSelector === 'button' ? 'a' : defaultSelector;
+        } else if (lowerLine.includes('input') || lowerLine.includes('field')) {
             return 'input, textarea';
         }
 
