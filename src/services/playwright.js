@@ -705,6 +705,9 @@ class PlaywrightTestService {
                     throw new Error(`Select element '${selector}' is not enabled`);
                 }
                 
+                // Small delay to ensure element is fully stabilized 
+                await this.page.waitForTimeout(100);
+                
                 await this.trySelectWithFallbacks(selector, value, options);
                 console.log(`Successfully selected option '${value}' using selector: ${selector}`);
                 return; // Success, exit the method
