@@ -166,7 +166,7 @@ class PlaywrightTestService {
                 break;
             case 'select':
                 await this.showInteractionIndicator(elementSelector, 'Selecting');
-                await this.page.selectOption(elementSelector, value, actionOptions);
+                await this.handleSelectAction(elementSelector, value, actionOptions);
                 break;
             case 'check':
                 await this.showInteractionIndicator(elementSelector, 'Checking');
@@ -676,6 +676,61 @@ class PlaywrightTestService {
             
         } catch (error) {
             console.warn(`Failed to show interaction indicator for ${selector}:`, error.message);
+        }
+    }
+
+    // Handle select actions with fallback from value to label
+    async handleSelectAction(elementSelector, value, options = {}) {
+        try {
+            // First try to select by value (maintains backward compatibility)
+            await this.page.selectOption(elementSelector, value, options);
+            console.log(`Successfully selected option by value: ${value}`);
+        } catch (valueError) {
+            console.warn(`Selection by value '${value}' failed: ${valueError.message}`);
+            
+            try {
+                // Fallback: try to select by label/text
+                await this.page.selectOption(elementSelector, { label: value }, options);
+                console.log(`Successfully selected option by label: ${value}`);
+            } catch (labelError) {
+                console.warn(`Selection by label '${value}' failed: ${labelError.message}`);
+                
+                try {
+                    // Second fallback: try case-insensitive value match
+                    const lowerValue = value.toLowerCase();
+                    await this.page.selectOption(elementSelector, lowerValue, options);
+                    console.log(`Successfully selected option by lowercase value: ${lowerValue}`);
+                } catch (caseError) {
+                    // Final fallback: provide detailed error information
+                    const availableOptions = await this.getAvailableSelectOptions(elementSelector);
+                    throw new Error(
+                        `Failed to select option '${value}' in dropdown. ` +
+                        `Tried: value='${value}', label='${value}', value='${value.toLowerCase()}'. ` +
+                        `Available options: ${availableOptions}`
+                    );
+                }
+            }
+        }
+    }
+
+    // Get available options from a select element for debugging
+    async getAvailableSelectOptions(selector) {
+        try {
+            const options = await this.page.evaluate((sel) => {
+                const selectElement = document.querySelector(sel);
+                if (!selectElement) return 'Select element not found';
+                
+                const optionElements = selectElement.querySelectorAll('option');
+                return Array.from(optionElements).map(opt => ({
+                    value: opt.value,
+                    text: opt.textContent.trim(),
+                    selected: opt.selected
+                }));
+            }, selector);
+            
+            return JSON.stringify(options, null, 2);
+        } catch (error) {
+            return `Error getting options: ${error.message}`;
         }
     }
 }
