@@ -22,7 +22,7 @@ The system generates test cases with the following JSON structure:
         "value": "input_value",
         "description": "Human readable description",
         "expectedUrl": "expected_url_for_verify",
-        "elementType": "button|link|generic",
+        "elementType": "button|link|select|generic",
         "timeout": 60000,
         "options": {}
       }
@@ -435,6 +435,7 @@ When multiple elements have the same text, use elementType to specify preference
 **Natural Language Examples:**
 - "Click the Login link in navigation" → `elementType: "link"`
 - "Click the Login button in form" → `elementType: "button"`
+- "Click the Country option in dropdown" → `elementType: "select"`
 - "Press the generic Login element" → `elementType: "generic"`
 
 ### Complex Selectors

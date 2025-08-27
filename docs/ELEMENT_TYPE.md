@@ -20,7 +20,7 @@ The `elementType` parameter provides element type prioritization for text-based 
 {
   "type": "click",
   "selector": "text=Login",
-  "elementType": "button|link|generic",
+  "elementType": "button|link|select|generic",
   "description": "Click description"
 }
 ```
@@ -29,6 +29,7 @@ The `elementType` parameter provides element type prioritization for text-based 
 
 - **`button`**: Prioritizes `<button>`, `<input type="submit">`, `<input type="button">`, `[role="button"]` elements
 - **`link`**: Prioritizes `<a>`, `[role="link"]` elements  
+- **`select`**: Prioritizes `<select>`, `<option>`, `[role="combobox"]`, `[role="listbox"]` elements
 - **`generic`**: Uses generic selectors like `[onclick]`, `*:has-text()` etc.
 
 ### Examples
@@ -53,6 +54,16 @@ The `elementType` parameter provides element type prioritization for text-based 
 }
 ```
 
+#### Clicking a Select/Dropdown Option
+```json
+{
+  "type": "click",
+  "selector": "text=United States",
+  "elementType": "select",
+  "description": "Click the United States option in country dropdown"
+}
+```
+
 #### Default Behavior (No elementType)
 ```json
 {
@@ -71,7 +82,8 @@ When `elementType` is specified, the system builds a prioritized list of selecto
 1. **First**: Selectors matching the specified element type
 2. **Then**: Button selectors (if not the specified type)
 3. **Then**: Link selectors (if not the specified type)  
-4. **Finally**: Generic selectors
+4. **Then**: Select selectors (if not the specified type)
+5. **Finally**: Generic selectors
 
 ### Backward Compatibility
 
