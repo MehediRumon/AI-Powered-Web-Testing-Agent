@@ -693,6 +693,18 @@ class PlaywrightTestService {
             console.log(`Trying selector ${i + 1}/${selectors.length}: ${selector}`);
             
             try {
+                // Wait for select element to be ready before attempting selection
+                await this.page.waitForSelector(selector, { 
+                    state: 'visible', 
+                    timeout: options.timeout || 60000 
+                });
+                
+                // Check if select element is enabled
+                const isEnabled = await this.page.isEnabled(selector);
+                if (!isEnabled) {
+                    throw new Error(`Select element '${selector}' is not enabled`);
+                }
+                
                 await this.trySelectWithFallbacks(selector, value, options);
                 console.log(`Successfully selected option '${value}' using selector: ${selector}`);
                 return; // Success, exit the method
@@ -725,16 +737,18 @@ class PlaywrightTestService {
 
     // Helper method to try select with all fallback strategies on a single selector
     async trySelectWithFallbacks(selector, value, options = {}) {
+        const selectTimeout = options.timeout || 30000; // Specific timeout for select operations
+        
         try {
             // First try to select by value (maintains backward compatibility)
-            await this.page.selectOption(selector, value, options);
+            await this.page.selectOption(selector, value, { timeout: selectTimeout });
             console.log(`Successfully selected option by value: ${value}`);
         } catch (valueError) {
             console.warn(`Selection by value '${value}' failed: ${valueError.message}`);
             
             try {
                 // Fallback: try to select by label/text
-                await this.page.selectOption(selector, { label: value }, options);
+                await this.page.selectOption(selector, { label: value }, { timeout: selectTimeout });
                 console.log(`Successfully selected option by label: ${value}`);
             } catch (labelError) {
                 console.warn(`Selection by label '${value}' failed: ${labelError.message}`);
@@ -742,16 +756,25 @@ class PlaywrightTestService {
                 try {
                     // Second fallback: try case-insensitive value match
                     const lowerValue = value.toLowerCase();
-                    await this.page.selectOption(selector, lowerValue, options);
+                    await this.page.selectOption(selector, lowerValue, { timeout: selectTimeout });
                     console.log(`Successfully selected option by lowercase value: ${lowerValue}`);
                 } catch (caseError) {
-                    // Final fallback: provide detailed error information
-                    const availableOptions = await this.getAvailableSelectOptions(selector);
-                    throw new Error(
-                        `Failed to select option '${value}' in dropdown '${selector}'. ` +
-                        `Tried: value='${value}', label='${value}', value='${value.toLowerCase()}'. ` +
-                        `Available options: ${availableOptions}`
-                    );
+                    console.warn(`Selection by lowercase value '${lowerValue}' failed: ${caseError.message}`);
+                    
+                    try {
+                        // Third fallback: try case-insensitive label match
+                        const upperValue = value.toUpperCase();
+                        await this.page.selectOption(selector, { label: upperValue }, { timeout: selectTimeout });
+                        console.log(`Successfully selected option by uppercase label: ${upperValue}`);
+                    } catch (upperError) {
+                        // Final fallback: provide detailed error information
+                        const availableOptions = await this.getAvailableSelectOptions(selector);
+                        throw new Error(
+                            `Failed to select option '${value}' in dropdown '${selector}'. ` +
+                            `Tried: value='${value}', label='${value}', value='${value.toLowerCase()}', label='${value.toUpperCase()}'. ` +
+                            `Available options: ${availableOptions}`
+                        );
+                    }
                 }
             }
         }
