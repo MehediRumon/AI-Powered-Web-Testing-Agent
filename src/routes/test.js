@@ -49,7 +49,8 @@ function validateActions(actions) {
             selector: action.selector ? action.selector.replace(/[<>'"]/g, '') : undefined,
             value: action.value ? action.value.replace(/[<>]/g, '') : undefined,
             description: action.description ? action.description.replace(/[<>]/g, '') : undefined,
-            expectedUrl: action.expectedUrl ? action.expectedUrl.replace(/[<>'"]/g, '') : undefined
+            expectedUrl: action.expectedUrl ? action.expectedUrl.replace(/[<>'"]/g, '') : undefined,
+            elementType: action.elementType ? action.elementType.replace(/[<>'"]/g, '') : undefined
         };
         
         return sanitized;
