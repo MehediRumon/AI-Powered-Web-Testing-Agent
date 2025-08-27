@@ -679,18 +679,47 @@ class PlaywrightTestService {
         }
     }
 
-    // Handle select actions with fallback from value to label
+    // Handle select actions with fallback from value to label and multiple selectors
     async handleSelectAction(elementSelector, value, options = {}) {
+        // Split comma-separated selectors and try each one
+        const selectors = elementSelector.split(',').map(s => s.trim()).filter(s => s.length > 0);
+        
+        let lastError = null;
+        const allAttempts = [];
+        
+        for (const selector of selectors) {
+            try {
+                // Try the fallback strategies for this selector
+                await this.trySelectWithFallbacks(selector, value, options);
+                console.log(`Successfully selected '${value}' using selector: ${selector}`);
+                return; // Success - exit early
+            } catch (selectorError) {
+                allAttempts.push(`${selector}: ${selectorError.message}`);
+                lastError = selectorError;
+                console.warn(`Selector '${selector}' failed: ${selectorError.message}`);
+            }
+        }
+        
+        // All selectors failed
+        throw new Error(
+            `Failed to select option '${value}' using any of the provided selectors. ` +
+            `Attempted selectors: [${selectors.join(', ')}]. ` +
+            `Detailed attempts: ${allAttempts.join(' | ')}`
+        );
+    }
+
+    // Helper method to try selection with fallbacks for a single selector
+    async trySelectWithFallbacks(selector, value, options = {}) {
         try {
             // First try to select by value (maintains backward compatibility)
-            await this.page.selectOption(elementSelector, value, options);
+            await this.page.selectOption(selector, value, options);
             console.log(`Successfully selected option by value: ${value}`);
         } catch (valueError) {
             console.warn(`Selection by value '${value}' failed: ${valueError.message}`);
             
             try {
                 // Fallback: try to select by label/text
-                await this.page.selectOption(elementSelector, { label: value }, options);
+                await this.page.selectOption(selector, { label: value }, options);
                 console.log(`Successfully selected option by label: ${value}`);
             } catch (labelError) {
                 console.warn(`Selection by label '${value}' failed: ${labelError.message}`);
@@ -698,11 +727,11 @@ class PlaywrightTestService {
                 try {
                     // Second fallback: try case-insensitive value match
                     const lowerValue = value.toLowerCase();
-                    await this.page.selectOption(elementSelector, lowerValue, options);
+                    await this.page.selectOption(selector, lowerValue, options);
                     console.log(`Successfully selected option by lowercase value: ${lowerValue}`);
                 } catch (caseError) {
                     // Final fallback: provide detailed error information
-                    const availableOptions = await this.getAvailableSelectOptions(elementSelector);
+                    const availableOptions = await this.getAvailableSelectOptions(selector);
                     throw new Error(
                         `Failed to select option '${value}' in dropdown. ` +
                         `Tried: value='${value}', label='${value}', value='${value.toLowerCase()}'. ` +

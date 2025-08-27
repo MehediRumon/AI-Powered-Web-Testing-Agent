@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Selector Test Page</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            background-color: #f5f5f5; 
+        }
+        .container { 
+            margin: 20px 0; 
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        select { 
+            width: 100%;
+            max-width: 300px;
+            padding: 8px; 
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .result { 
+            margin-top: 20px; 
+            padding: 15px; 
+            background-color: #f0f0f0; 
+            border-radius: 5px; 
+            border-left: 4px solid #007bff;
+        }
+        .success { 
+            border-left-color: #28a745; 
+            background-color: #d4edda; 
+        }
+        .error { 
+            border-left-color: #dc3545; 
+            background-color: #f8d7da; 
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Multi-Selector Test Page</h1>
+    <p>This page contains dropdowns to test the enhanced select functionality with multiple selectors.</p>
+    
+    <!-- Test Case 1: Mobile Banking Type (from problem statement) -->
+    <div class="container">
+        <h3>📱 Mobile Banking Type</h3>
+        <div class="form-group">
+            <label for="MobileBankingType">Mobile Banking Type:</label>
+            <select id="MobileBankingType" name="MobileBankingType" onchange="showResult('Selected Mobile Banking Type: ' + this.options[this.selectedIndex].text)">
+                <option value="">Select Type</option>
+                <option value="20">Nagad</option>
+                <option value="10">bKash</option>
+                <option value="30">Rocket</option>
+            </select>
+        </div>
+    </div>
+    
+    <!-- Test Case 2: Teacher Grade (from problem statement - multiple possible selectors) -->
+    <div class="container">
+        <h3>👨‍🏫 Teacher Grade</h3>
+        <div class="form-group">
+            <label for="teachergradeType">Teacher Grade:</label>
+            <!-- Only teachergradeType exists, others should be tried and fail -->
+            <select id="teachergradeType" name="teachergradeType" onchange="showResult('Selected Teacher Grade: ' + this.options[this.selectedIndex].text)">
+                <option value="">Select Grade</option>
+                <option value="level1">Level-01</option>
+                <option value="level2">Level-02</option>
+                <option value="level3">Level-03</option>
+            </select>
+        </div>
+    </div>
+    
+    <!-- Test Case 3: Religion (from problem statement - multiple possible selectors) -->
+    <div class="container">
+        <h3>🕌 Religion</h3>
+        <div class="form-group">
+            <label for="religion">Religion:</label>
+            <!-- Only religion exists, others should be tried and fail -->
+            <select id="religion" name="religion" onchange="showResult('Selected Religion: ' + this.options[this.selectedIndex].text)">
+                <option value="">Select Religion</option>
+                <option value="islam">Islam</option>
+                <option value="christianity">Christianity</option>
+                <option value="hinduism">Hinduism</option>
+                <option value="buddhism">Buddhism</option>
+            </select>
+        </div>
+    </div>
+    
+    <!-- Additional test: Existing mobile banking from original test page -->
+    <div class="container">
+        <h3>📱 Mobile Banking (Original)</h3>
+        <div class="form-group">
+            <label for="mobile-banking-type">Mobile Banking Type (Original):</label>
+            <select id="mobile-banking-type" name="mobile-banking-type" onchange="showResult('Selected Original Mobile Banking: ' + this.options[this.selectedIndex].text)">
+                <option value="">Select Mobile Banking Type</option>
+                <option value="bkash">bKash</option>
+                <option value="nagad">Nagad</option>
+                <option value="rocket">Rocket</option>
+            </select>
+        </div>
+    </div>
+    
+    <!-- Result display -->
+    <div id="result" class="result">No interactions yet</div>
+    
+    <div style="margin-top: 30px;">
+        <h3>🎯 Test Instructions:</h3>
+        <ol>
+            <li><strong>Mobile Banking Type:</strong> Use selector "#MobileBankingType" to select "Nagad"</li>
+            <li><strong>Teacher Grade:</strong> Use multi-selector "#teachergrade, #teachergradeType, select[name=teachergrade], select[name=teachergradeType]" to select "Level-01"</li>
+            <li><strong>Religion:</strong> Use multi-selector "#religion, #religionType, select[name=religion], select[name=religionType]" to select "Islam"</li>
+        </ol>
+        
+        <h3>🧪 Expected Behavior:</h3>
+        <ul>
+            <li>Single selectors work as before (backward compatible)</li>
+            <li>Multi-selectors try each selector until one succeeds</li>
+            <li>Each selector gets full fallback treatment (value → label → lowercase)</li>
+            <li>Detailed error messages if all selectors fail</li>
+        </ul>
+        
+        <h3>📋 Test Cases from Problem Statement:</h3>
+        <pre><code>// Test Case 1
+{
+  "type": "select",
+  "selector": "#MobileBankingType",
+  "value": "Nagad",
+  "description": "Select 'Nagad' from the Mobile Banking Type dropdown"
+}
+
+// Test Case 2  
+{
+  "type": "select",
+  "selector": "#teachergrade, #teachergradeType, select[name=teachergrade], select[name=teachergradeType]",
+  "value": "Level-01",
+  "description": "Select 'Level-01' from the Teacher Grade dropdown"
+}
+
+// Test Case 3
+{
+  "type": "select", 
+  "selector": "#religion, #religionType, select[name=religion], select[name=religionType]",
+  "value": "Islam",
+  "description": "Select 'Islam' from the Religion dropdown"
+}</code></pre>
+    </div>
+    
+    <script>
+        function showResult(message) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = message + ' ✅';
+            resultDiv.className = 'result success';
+            
+            // Reset after 5 seconds
+            setTimeout(() => {
+                resultDiv.textContent = 'No interactions yet';
+                resultDiv.className = 'result';
+            }, 5000);
+        }
+
+        // Add error handling for failed selections
+        window.addEventListener('error', function(e) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = 'Error: ' + e.message + ' ❌';
+            resultDiv.className = 'result error';
+        });
+    </script>
+</body>
+</html>
