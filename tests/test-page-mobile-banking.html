@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mobile Banking Type Test Page</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background-color: #f5f5f5;
+        }
+        .container { 
+            margin: 20px 0; 
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        select { 
+            width: 100%;
+            max-width: 300px;
+            padding: 8px; 
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .result { 
+            margin-top: 20px; 
+            padding: 15px; 
+            background-color: #f0f0f0; 
+            border-radius: 5px; 
+            border-left: 4px solid #007bff;
+        }
+        .success {
+            background-color: #d4edda;
+            border-left-color: #28a745;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border-left-color: #dc3545;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <h1>Mobile Banking Type Selection Test</h1>
+    
+    <div class="container">
+        <h3>Payment Form</h3>
+        
+        <div class="form-group">
+            <label for="payment-method">Payment Method:</label>
+            <select id="payment-method" name="payment-method" onchange="showResult('Selected payment method: ' + this.value)">
+                <option value="">Select Payment Method</option>
+                <option value="card">Credit/Debit Card</option>
+                <option value="mobile-banking">Mobile Banking</option>
+                <option value="bank-transfer">Bank Transfer</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="mobile-banking-type">Mobile Banking Type:</label>
+            <select id="mobile-banking-type" name="mobile-banking-type" onchange="showResult('Selected Mobile Banking Type: ' + this.options[this.selectedIndex].text)">
+                <option value="">Select Mobile Banking Type</option>
+                <option value="bkash">bKash</option>
+                <option value="nagad">Nagad</option>
+                <option value="rocket">Rocket</option>
+                <option value="upay">Upay</option>
+                <option value="sure-cash">SureCash</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="mobile-number">Mobile Number:</label>
+            <input type="text" id="mobile-number" name="mobile-number" placeholder="Enter mobile number" 
+                   oninput="showResult('Entered mobile number: ' + this.value)">
+        </div>
+    </div>
+    
+    <!-- Result display -->
+    <div id="result" class="result">No interactions yet</div>
+    
+    <div style="margin-top: 30px;">
+        <h3>Test Instructions:</h3>
+        <ol>
+            <li><strong>Select "Nagad" from Mobile Banking Type dropdown</strong></li>
+            <li>Expected result: "Selected Mobile Banking Type: Nagad"</li>
+            <li>Test both "select" action type and "click" with elementType="select"</li>
+        </ol>
+        
+        <h3>Test Cases to Try:</h3>
+        <pre><code>1. Using select action:
+{
+  "type": "select",
+  "selector": "#mobile-banking-type",
+  "value": "nagad",
+  "description": "Select Nagad from Mobile Banking Type dropdown"
+}
+
+2. Using click with elementType:
+{
+  "type": "click",
+  "selector": "text=Nagad",
+  "elementType": "select",
+  "description": "Click Nagad option in Mobile Banking Type dropdown"
+}
+
+3. Using select with text selector:
+{
+  "type": "select",
+  "selector": "select[name='mobile-banking-type']",
+  "value": "Nagad",
+  "description": "Select Nagad by text value"
+}</code></pre>
+    </div>
+    
+    <script>
+        function showResult(message) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = message + ' ✅';
+            resultDiv.className = 'result success';
+            
+            // Reset after 5 seconds
+            setTimeout(() => {
+                resultDiv.textContent = 'No interactions yet';
+                resultDiv.className = 'result';
+            }, 5000);
+        }
+
+        // Add error handling for failed selections
+        window.addEventListener('error', function(e) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = 'Error: ' + e.message + ' ❌';
+            resultDiv.className = 'result error';
+        });
+    </script>
+</body>
+</html>
