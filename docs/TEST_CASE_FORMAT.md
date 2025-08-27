@@ -177,6 +177,7 @@ Select options from dropdowns.
 - "Select 'United States' from country dropdown"
 - "Choose 'Premium' from plan options"
 - "Pick 'January' from month selector"
+- "Select 'Nagad' from Mobile Banking Type dropdown"
 
 **Generated Actions:**
 ```json
@@ -185,6 +186,32 @@ Select options from dropdowns.
   "locator": "select[name='country']",
   "value": "United States",
   "description": "Select country"
+}
+```
+
+**Enhanced Select Functionality:**
+The select action now supports multiple selection strategies:
+1. **By value** (original): `"value": "us"` matches `<option value="us">United States</option>`
+2. **By text/label** (new): `"value": "United States"` matches the visible text
+3. **Case-insensitive** (fallback): `"value": "NAGAD"` matches `<option value="nagad">Nagad</option>`
+
+**Mobile Banking Example:**
+```json
+{
+  "type": "select",
+  "locator": "#mobile-banking-type",
+  "value": "Nagad",
+  "description": "Select Nagad from Mobile Banking Type dropdown"
+}
+```
+
+**Alternative with elementType:**
+```json
+{
+  "type": "click",
+  "locator": "text=Nagad",
+  "elementType": "select",
+  "description": "Click Nagad option using select elementType"
 }
 ```
 

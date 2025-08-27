@@ -93,6 +93,30 @@ This document outlines the enhanced features implemented to better align with th
   - `assert_text`: Text content assertions
 - **Compatibility**: Maintains backward compatibility with existing action types
 
+### 7. Enhanced Select Action with Smart Fallback
+- **Feature**: Intelligent dropdown selection with multiple selection strategies
+- **Problem Solved**: Mobile Banking Type "Nagad" selection failures due to value/text mismatch
+- **Implementation**: Added `handleSelectAction()` method with fallback logic
+- **Selection Strategies**:
+  1. **By value** (original): `value: "nagad"` matches `<option value="nagad">`
+  2. **By text/label** (new): `value: "Nagad"` matches visible text in option
+  3. **Case-insensitive** (fallback): `value: "NAGAD"` matches lowercase values
+  4. **Detailed errors**: Shows available options when selection fails
+- **Benefits**:
+  - Fixes common dropdown selection issues
+  - User-friendly - works with visible text values
+  - Backward compatible - existing tests continue working
+  - Better error messages for debugging
+- **Example Usage**:
+```json
+{
+  "type": "select",
+  "locator": "#mobile-banking-type",
+  "value": "Nagad",
+  "description": "Select Nagad from Mobile Banking Type dropdown"
+}
+```
+
 ## Technical Implementation Details
 
 ### File Structure
