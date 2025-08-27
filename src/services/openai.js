@@ -305,6 +305,16 @@ Example output:
                     return '#MobileBankingType';
                 }
                 
+                // Teacher grade specific patterns
+                if (fieldName.includes('teacher grade') || fieldName.includes('teachergrade')) {
+                    return '#teachergrade, #teachergradeType, select[name=teachergrade], select[name=teachergradeType]';
+                }
+                
+                // Religion specific patterns
+                if (fieldName.includes('religion')) {
+                    return '#religion, #religionType, select[name=religion], select[name=religionType]';
+                }
+                
                 // Other common patterns
                 if (fieldName.includes('country')) {
                     return '#country, select[name="country"]';

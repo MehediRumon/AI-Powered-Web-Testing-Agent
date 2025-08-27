@@ -681,16 +681,60 @@ class PlaywrightTestService {
 
     // Handle select actions with fallback from value to label
     async handleSelectAction(elementSelector, value, options = {}) {
+        // Parse multiple selectors if comma-separated
+        const selectors = elementSelector.split(',').map(s => s.trim()).filter(s => s.length > 0);
+        
+        let lastError = null;
+        let allAvailableOptions = [];
+        
+        // Try each selector sequentially
+        for (let i = 0; i < selectors.length; i++) {
+            const selector = selectors[i];
+            console.log(`Trying selector ${i + 1}/${selectors.length}: ${selector}`);
+            
+            try {
+                await this.trySelectWithFallbacks(selector, value, options);
+                console.log(`Successfully selected option '${value}' using selector: ${selector}`);
+                return; // Success, exit the method
+            } catch (selectorError) {
+                console.warn(`Selector '${selector}' failed: ${selectorError.message}`);
+                lastError = selectorError;
+                
+                // Collect available options for debugging
+                try {
+                    const availableOptions = await this.getAvailableSelectOptions(selector);
+                    if (availableOptions && !availableOptions.includes('Select element not found')) {
+                        allAvailableOptions.push(`Selector '${selector}': ${availableOptions}`);
+                    }
+                } catch (optionsError) {
+                    // Ignore errors when getting available options
+                }
+            }
+        }
+        
+        // If all selectors failed, throw comprehensive error
+        const availableOptionsText = allAvailableOptions.length > 0 
+            ? `\nAvailable options:\n${allAvailableOptions.join('\n')}` 
+            : '';
+            
+        throw new Error(
+            `Failed to select option '${value}' in dropdown using any of the provided selectors: ${selectors.join(', ')}. ` +
+            `Last error: ${lastError?.message || 'Unknown error'}${availableOptionsText}`
+        );
+    }
+
+    // Helper method to try select with all fallback strategies on a single selector
+    async trySelectWithFallbacks(selector, value, options = {}) {
         try {
             // First try to select by value (maintains backward compatibility)
-            await this.page.selectOption(elementSelector, value, options);
+            await this.page.selectOption(selector, value, options);
             console.log(`Successfully selected option by value: ${value}`);
         } catch (valueError) {
             console.warn(`Selection by value '${value}' failed: ${valueError.message}`);
             
             try {
                 // Fallback: try to select by label/text
-                await this.page.selectOption(elementSelector, { label: value }, options);
+                await this.page.selectOption(selector, { label: value }, options);
                 console.log(`Successfully selected option by label: ${value}`);
             } catch (labelError) {
                 console.warn(`Selection by label '${value}' failed: ${labelError.message}`);
@@ -698,13 +742,13 @@ class PlaywrightTestService {
                 try {
                     // Second fallback: try case-insensitive value match
                     const lowerValue = value.toLowerCase();
-                    await this.page.selectOption(elementSelector, lowerValue, options);
+                    await this.page.selectOption(selector, lowerValue, options);
                     console.log(`Successfully selected option by lowercase value: ${lowerValue}`);
                 } catch (caseError) {
                     // Final fallback: provide detailed error information
-                    const availableOptions = await this.getAvailableSelectOptions(elementSelector);
+                    const availableOptions = await this.getAvailableSelectOptions(selector);
                     throw new Error(
-                        `Failed to select option '${value}' in dropdown. ` +
+                        `Failed to select option '${value}' in dropdown '${selector}'. ` +
                         `Tried: value='${value}', label='${value}', value='${value.toLowerCase()}'. ` +
                         `Available options: ${availableOptions}`
                     );
