@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Element Type Priority Test Page</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .navbar { background-color: #f8f9fa; padding: 10px; margin-bottom: 20px; }
+        .form-container { border: 1px solid #ccc; padding: 20px; margin-top: 20px; }
+        .result { background-color: #e9ecef; padding: 10px; margin-top: 20px; font-weight: bold; }
+        .btn { background-color: #007bff; color: white; padding: 8px 16px; border: none; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>Element Type Priority Test Page</h1>
+    <p>This page tests the element type prioritization fix. It contains multiple elements with the same text "Log in".</p>
+    
+    <!-- Navbar with Log in link -->
+    <nav class="navbar">
+        <a class="navbar-brand" href="/Account/Login">Log in</a>
+        <span>(This is a navbar link)</span>
+    </nav>
+    
+    <!-- Form with Log in button -->
+    <div class="form-container">
+        <h3>Login Form</h3>
+        <form>
+            <input type="text" placeholder="Username" style="margin: 5px; padding: 5px;"><br>
+            <input type="password" placeholder="Password" style="margin: 5px; padding: 5px;"><br>
+            <button type="submit" name="Submit" id="Submit" value="Log in" class="btn btn-primary btn-sm">Log in</button>
+            <span>(This is a submit button)</span>
+        </form>
+    </div>
+    
+    <!-- Result display -->
+    <div id="result" class="result">No clicks yet</div>
+    
+    <div style="margin-top: 30px;">
+        <h3>Test Instructions:</h3>
+        <ol>
+            <li><strong>Click Log in button</strong> - Should click the submit button and show "Clicked submit button"</li>
+            <li><strong>Click Log in link</strong> - Should click the navbar link and show "Clicked navbar link"</li>
+            <li><strong>Click Log in</strong> (without specifying type) - Should click the button by default</li>
+        </ol>
+        
+        <h3>Example Test Cases:</h3>
+        <pre><code>{
+  "type": "click",
+  "selector": "text=Log in",
+  "elementType": "button",
+  "description": "Click the Log in button"
+}</code></pre>
+
+        <pre><code>{
+  "type": "click", 
+  "selector": "text=Log in",
+  "elementType": "link",
+  "description": "Click the Log in link"
+}</code></pre>
+    </div>
+    
+    <script>
+        // Add click tracking to demonstrate the fix
+        document.querySelector('a.navbar-brand').addEventListener('click', function(e) {
+            e.preventDefault();
+            document.getElementById('result').textContent = 'Clicked navbar link ✅';
+            document.getElementById('result').style.backgroundColor = '#d1ecf1';
+        });
+        
+        document.querySelector('button[type="submit"]').addEventListener('click', function(e) {
+            e.preventDefault();
+            document.getElementById('result').textContent = 'Clicked submit button ✅';
+            document.getElementById('result').style.backgroundColor = '#d4edda';
+        });
+    </script>
+</body>
+</html>
