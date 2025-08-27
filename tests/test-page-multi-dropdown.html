@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Multi-Selector Dropdown Test Page</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            max-width: 800px; 
+        }
+        .container { 
+            margin: 20px 0; 
+            padding: 15px; 
+            border: 1px solid #ddd; 
+            border-radius: 5px; 
+        }
+        select { 
+            margin: 5px; 
+            padding: 8px; 
+            width: 200px; 
+            font-size: 14px; 
+        }
+        .result { 
+            margin-top: 20px; 
+            padding: 10px; 
+            background-color: #f0f0f0; 
+            border-radius: 5px; 
+            font-weight: bold;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Multi-Selector Dropdown Testing Page</h1>
+    
+    <!-- Mobile Banking Type Dropdown -->
+    <div class="container">
+        <h3>Mobile Banking Type</h3>
+        <label for="MobileBankingType">Select Mobile Banking Type:</label>
+        <select id="MobileBankingType" name="MobileBankingType" onchange="showResult('mobile-banking', this.value, this.options[this.selectedIndex].text)">
+            <option value="">Select Type</option>
+            <option value="20">Nagad</option>
+            <option value="10">bKash</option>
+            <option value="30">Rocket</option>
+        </select>
+        <div id="mobile-banking-result" class="result">No selection yet</div>
+    </div>
+    
+    <!-- Teacher Grade Dropdown -->
+    <div class="container">
+        <h3>Teacher Grade</h3>
+        <label for="teachergrade">Select Teacher Grade:</label>
+        <select id="teachergrade" name="teachergrade" onchange="showResult('teacher-grade', this.value, this.options[this.selectedIndex].text)">
+            <option value="">Select Grade</option>
+            <option value="level-01">Level-01</option>
+            <option value="level-02">Level-02</option>
+            <option value="level-03">Level-03</option>
+        </select>
+        <div id="teacher-grade-result" class="result">No selection yet</div>
+    </div>
+    
+    <!-- Alternative Teacher Grade Dropdown (using different ID/name) -->
+    <div class="container">
+        <h3>Teacher Grade (Alternative)</h3>
+        <label for="teachergradeType">Select Teacher Grade Type:</label>
+        <select id="teachergradeType" name="teachergradeType" onchange="showResult('teacher-grade-alt', this.value, this.options[this.selectedIndex].text)">
+            <option value="">Select Grade Type</option>
+            <option value="level-01">Level-01</option>
+            <option value="level-02">Level-02</option>
+            <option value="level-03">Level-03</option>
+        </select>
+        <div id="teacher-grade-alt-result" class="result">No selection yet</div>
+    </div>
+    
+    <!-- Religion Dropdown -->
+    <div class="container">
+        <h3>Religion</h3>
+        <label for="religion">Select Religion:</label>
+        <select id="religion" name="religion" onchange="showResult('religion', this.value, this.options[this.selectedIndex].text)">
+            <option value="">Select Religion</option>
+            <option value="islam">Islam</option>
+            <option value="christianity">Christianity</option>
+            <option value="hinduism">Hinduism</option>
+            <option value="buddhism">Buddhism</option>
+        </select>
+        <div id="religion-result" class="result">No selection yet</div>
+    </div>
+    
+    <!-- Alternative Religion Dropdown (using different ID/name) -->
+    <div class="container">
+        <h3>Religion (Alternative)</h3>
+        <label for="religionType">Select Religion Type:</label>
+        <select id="religionType" name="religionType" onchange="showResult('religion-alt', this.value, this.options[this.selectedIndex].text)">
+            <option value="">Select Religion Type</option>
+            <option value="islam">Islam</option>
+            <option value="christianity">Christianity</option>
+            <option value="hinduism">Hinduism</option>
+            <option value="buddhism">Buddhism</option>
+        </select>
+        <div id="religion-alt-result" class="result">No selection yet</div>
+    </div>
+    
+    <!-- Overall Result Display -->
+    <div class="container">
+        <h3>Test Results Summary</h3>
+        <div id="overall-result" class="result info">
+            Waiting for selections...
+        </div>
+    </div>
+
+    <script>
+        function showResult(category, value, text) {
+            const resultDiv = document.getElementById(category + '-result');
+            if (value) {
+                resultDiv.textContent = `Selected ${text} (value: ${value}) ✅`;
+                resultDiv.className = 'result success';
+                
+                // Update overall result
+                updateOverallResult(category, text, value);
+            } else {
+                resultDiv.textContent = 'No selection';
+                resultDiv.className = 'result';
+            }
+        }
+        
+        function updateOverallResult(category, text, value) {
+            const overallDiv = document.getElementById('overall-result');
+            const timestamp = new Date().toLocaleTimeString();
+            
+            let categoryName = '';
+            switch(category) {
+                case 'mobile-banking': categoryName = 'Mobile Banking Type'; break;
+                case 'teacher-grade': categoryName = 'Teacher Grade'; break;
+                case 'teacher-grade-alt': categoryName = 'Teacher Grade (Alternative)'; break;
+                case 'religion': categoryName = 'Religion'; break;
+                case 'religion-alt': categoryName = 'Religion (Alternative)'; break;
+            }
+            
+            overallDiv.innerHTML = `
+                <strong>Last Selection:</strong><br>
+                Category: ${categoryName}<br>
+                Text: ${text}<br>
+                Value: ${value}<br>
+                Time: ${timestamp}
+            `;
+            overallDiv.className = 'result success';
+        }
+    </script>
+</body>
+</html>
