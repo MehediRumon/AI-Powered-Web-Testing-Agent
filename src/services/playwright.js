@@ -705,6 +705,9 @@ class PlaywrightTestService {
                     throw new Error(`Select element '${selector}' is not enabled`);
                 }
                 
+                // Small delay to ensure element is fully stabilized 
+                await this.page.waitForTimeout(100);
+                
                 await this.trySelectWithFallbacks(selector, value, options);
                 console.log(`Successfully selected option '${value}' using selector: ${selector}`);
                 return; // Success, exit the method
@@ -739,39 +742,62 @@ class PlaywrightTestService {
     async trySelectWithFallbacks(selector, value, options = {}) {
         const selectTimeout = options.timeout || 30000; // Specific timeout for select operations
         
+        console.log(`Attempting to select '${value}' using selector '${selector}'`);
+        
         try {
             // First try to select by value (maintains backward compatibility)
             await this.page.selectOption(selector, value, { timeout: selectTimeout });
-            console.log(`Successfully selected option by value: ${value}`);
+            console.log(`✅ Successfully selected option by value: ${value}`);
         } catch (valueError) {
-            console.warn(`Selection by value '${value}' failed: ${valueError.message}`);
+            console.warn(`❌ Selection by value '${value}' failed: ${valueError.message}`);
             
             try {
                 // Fallback: try to select by label/text
                 await this.page.selectOption(selector, { label: value }, { timeout: selectTimeout });
-                console.log(`Successfully selected option by label: ${value}`);
+                console.log(`✅ Successfully selected option by label: ${value}`);
             } catch (labelError) {
-                console.warn(`Selection by label '${value}' failed: ${labelError.message}`);
+                console.warn(`❌ Selection by label '${value}' failed: ${labelError.message}`);
                 
                 try {
                     // Second fallback: try case-insensitive value match
                     const lowerValue = value.toLowerCase();
                     await this.page.selectOption(selector, lowerValue, { timeout: selectTimeout });
-                    console.log(`Successfully selected option by lowercase value: ${lowerValue}`);
+                    console.log(`✅ Successfully selected option by lowercase value: ${lowerValue}`);
                 } catch (caseError) {
-                    console.warn(`Selection by lowercase value '${lowerValue}' failed: ${caseError.message}`);
+                    console.warn(`❌ Selection by lowercase value '${lowerValue}' failed: ${caseError.message}`);
                     
                     try {
-                        // Third fallback: try case-insensitive label match
-                        const upperValue = value.toUpperCase();
-                        await this.page.selectOption(selector, { label: upperValue }, { timeout: selectTimeout });
-                        console.log(`Successfully selected option by uppercase label: ${upperValue}`);
-                    } catch (upperError) {
+                        // Third fallback: try case-insensitive label match using evaluate
+                        const caseInsensitiveResult = await this.page.evaluate((sel, val) => {
+                            const selectElement = document.querySelector(sel);
+                            if (!selectElement) return { success: false, error: 'Element not found' };
+                            
+                            const options = Array.from(selectElement.querySelectorAll('option'));
+                            const matchingOption = options.find(opt => 
+                                opt.textContent.trim().toLowerCase() === val.toLowerCase()
+                            );
+                            
+                            if (matchingOption) {
+                                selectElement.value = matchingOption.value;
+                                selectElement.dispatchEvent(new Event('change', { bubbles: true }));
+                                return { success: true, matchedText: matchingOption.textContent.trim(), matchedValue: matchingOption.value };
+                            }
+                            
+                            return { success: false, error: 'No case-insensitive text match found' };
+                        }, selector, value);
+                        
+                        if (caseInsensitiveResult.success) {
+                            console.log(`✅ Successfully selected option by case-insensitive text: ${value} → ${caseInsensitiveResult.matchedText} (value: ${caseInsensitiveResult.matchedValue})`);
+                        } else {
+                            throw new Error(caseInsensitiveResult.error);
+                        }
+                    } catch (caseInsensitiveError) {
+                        console.warn(`❌ Case-insensitive text selection failed: ${caseInsensitiveError.message}`);
                         // Final fallback: provide detailed error information
                         const availableOptions = await this.getAvailableSelectOptions(selector);
                         throw new Error(
                             `Failed to select option '${value}' in dropdown '${selector}'. ` +
-                            `Tried: value='${value}', label='${value}', value='${value.toLowerCase()}', label='${value.toUpperCase()}'. ` +
+                            `Tried: value='${value}', label='${value}', value='${value.toLowerCase()}', case-insensitive-text='${value}'. ` +
                             `Available options: ${availableOptions}`
                         );
                     }
