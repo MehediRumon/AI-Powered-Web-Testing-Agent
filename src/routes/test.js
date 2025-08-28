@@ -298,7 +298,7 @@ router.delete('/cases/:id', authenticateToken, (req, res) => {
 router.post('/execute/:id', authenticateToken, async (req, res) => {
     try {
         const testCaseId = req.params.id;
-        const { browserType = 'chromium', headless = true } = req.body;
+        const { browserType = 'chromium', headless = true, interactionDelay = 5 } = req.body;
 
         const db = getDatabase();
 
@@ -326,7 +326,7 @@ router.post('/execute/:id', authenticateToken, async (req, res) => {
         
         try {
             await testService.initialize(browserType, headless);
-            const result = await testService.runTest(testCase);
+            const result = await testService.runTest(testCase, { interactionDelay });
 
             // Save test result
             db.run(
@@ -371,7 +371,7 @@ router.post('/execute/:id', authenticateToken, async (req, res) => {
 // Execute all test cases
 router.post('/execute-all', authenticateToken, async (req, res) => {
     try {
-        const { browserType = 'chromium', headless = true, parallel = false, maxConcurrency = 3 } = req.body;
+        const { browserType = 'chromium', headless = true, parallel = false, maxConcurrency = 3, interactionDelay = 5 } = req.body;
         const db = getDatabase();
 
         // Get all test cases for the user
@@ -404,7 +404,7 @@ router.post('/execute-all', authenticateToken, async (req, res) => {
                     
                     for (const testCase of testCaseBatch) {
                         testCase.actions = JSON.parse(testCase.actions || '[]');
-                        const result = await testService.runTest(testCase);
+                        const result = await testService.runTest(testCase, { interactionDelay });
 
                         // Save test result
                         await new Promise((resolve, reject) => {
@@ -453,7 +453,7 @@ router.post('/execute-all', authenticateToken, async (req, res) => {
 
                 for (const testCase of testCases) {
                     testCase.actions = JSON.parse(testCase.actions || '[]');
-                    const result = await testService.runTest(testCase);
+                    const result = await testService.runTest(testCase, { interactionDelay });
 
                     // Save test result
                     await new Promise((resolve, reject) => {
