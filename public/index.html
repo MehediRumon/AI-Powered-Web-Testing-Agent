@@ -477,6 +477,159 @@
                 margin-left: 2rem;
             }
         }
+
+        /* Recorder Styles */
+        .recorder-section {
+            padding: 1rem 0;
+        }
+
+        .recorder-controls {
+            display: flex;
+            gap: 1rem;
+            margin: 1rem 0;
+            flex-wrap: wrap;
+        }
+
+        .recorder-controls button {
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .recording-status {
+            margin: 1rem 0;
+            padding: 1rem;
+            border-radius: 4px;
+            font-weight: 500;
+            text-align: center;
+            display: none;
+        }
+
+        .recording-status.active {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+
+        .recording-status.paused {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+            display: block;
+        }
+
+        .recording-status.stopped {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+
+        .recorded-actions {
+            margin-top: 2rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 1rem;
+        }
+
+        .actions-list {
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 1rem 0;
+        }
+
+        .action-item {
+            background: #f8f9fa;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .action-details {
+            flex: 1;
+        }
+
+        .action-type {
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .action-target {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .action-value {
+            color: #333;
+            font-style: italic;
+        }
+
+        .action-remove {
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            padding: 0.25rem 0.5rem;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .actions-controls {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .recording-instructions {
+            background: #f8f9fa;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+
+        .recording-instructions h5 {
+            margin-bottom: 0.5rem;
+            color: #667eea;
+        }
+
+        .recording-instructions ol {
+            margin-left: 1.5rem;
+        }
+
+        .recording-instructions li {
+            margin-bottom: 0.25rem;
+        }
+
+        .btn-primary {
+            background: #667eea;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+        }
+
+        .btn-success {
+            background: #28a745;
+        }
+
+        @media (max-width: 768px) {
+            .recorder-controls {
+                flex-direction: column;
+            }
+            
+            .recorder-controls button {
+                min-width: auto;
+            }
+            
+            .actions-controls {
+                flex-direction: column;
+            }
+        }
     </style>
 </head>
 <body>
@@ -581,6 +734,7 @@
                             <div class="tab active" onclick="switchTestTab('manual')">Manual</div>
                             <div class="tab" onclick="switchTestTab('ai')">AI Assistant</div>
                             <div class="tab" onclick="switchTestTab('upload')">Upload</div>
+                            <div class="tab" onclick="switchTestTab('record')">Record</div>
                         </div>
 
                         <!-- Manual Test Creation -->
@@ -629,6 +783,64 @@
                                 <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,.json" style="display: none;" onchange="uploadFile()">
                             </div>
                             <div id="uploadResult"></div>
+                        </div>
+
+                        <!-- Interaction Recorder -->
+                        <div id="recordTestTab" class="tab-content">
+                            <div class="recorder-section">
+                                <h4>Interaction Recorder</h4>
+                                <p>Record your interactions on a webpage to automatically generate test cases.</p>
+                                
+                                <div class="form-group">
+                                    <label for="recordTestName">Test Name</label>
+                                    <input type="text" id="recordTestName" placeholder="Enter test name" required>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="recordTestUrl">Target URL</label>
+                                    <input type="url" id="recordTestUrl" placeholder="https://example.com" required>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="recordTestDescription">Description (Optional)</label>
+                                    <textarea id="recordTestDescription" rows="2" placeholder="Describe what this test will do"></textarea>
+                                </div>
+                                
+                                <div class="recorder-controls">
+                                    <button id="startRecordingBtn" onclick="startRecording()" class="btn-primary">
+                                        🔴 Start Recording
+                                    </button>
+                                    <button id="stopRecordingBtn" onclick="stopRecording()" class="btn-secondary" disabled>
+                                        ⏹️ Stop Recording
+                                    </button>
+                                    <button id="pauseRecordingBtn" onclick="pauseRecording()" class="btn-secondary" disabled>
+                                        ⏸️ Pause Recording
+                                    </button>
+                                </div>
+                                
+                                <div id="recordingStatus" class="recording-status"></div>
+                                
+                                <div id="recordedActions" class="recorded-actions" style="display: none;">
+                                    <h5>Recorded Actions:</h5>
+                                    <div class="actions-list" id="actionsList"></div>
+                                    <div class="actions-controls">
+                                        <button onclick="clearRecordedActions()" class="btn-secondary">Clear All</button>
+                                        <button onclick="saveRecordedTest()" class="btn-success">Save Test Case</button>
+                                    </div>
+                                </div>
+                                
+                                <div id="recordingInstructions" class="recording-instructions">
+                                    <h5>How to use:</h5>
+                                    <ol>
+                                        <li>Enter a test name and target URL</li>
+                                        <li>Click "Start Recording"</li>
+                                        <li>A new window will open to the target URL</li>
+                                        <li>Perform your interactions (clicks, typing, etc.)</li>
+                                        <li>Click "Stop Recording" when done</li>
+                                        <li>Review and save your test case</li>
+                                    </ol>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1625,6 +1837,321 @@
             } catch (error) {
                 showStatus(`Report generation failed: ${error.message}`, 'error');
             }
+        }
+
+        // Interaction Recorder functionality
+        let isRecording = false;
+        let isPaused = false;
+        let recordedActions = [];
+        let recordingWindow = null;
+        let recordingStartTime = null;
+
+        function startRecording() {
+            const testName = document.getElementById('recordTestName').value.trim();
+            const testUrl = document.getElementById('recordTestUrl').value.trim();
+            
+            if (!testName || !testUrl) {
+                showStatus('Please enter both test name and URL to start recording', 'error');
+                return;
+            }
+
+            // Validate URL
+            try {
+                new URL(testUrl);
+            } catch (e) {
+                showStatus('Please enter a valid URL', 'error');
+                return;
+            }
+
+            isRecording = true;
+            isPaused = false;
+            recordedActions = [];
+            recordingStartTime = Date.now();
+            
+            // Update UI
+            document.getElementById('startRecordingBtn').disabled = true;
+            document.getElementById('stopRecordingBtn').disabled = false;
+            document.getElementById('pauseRecordingBtn').disabled = false;
+            
+            // Show recording status
+            const statusDiv = document.getElementById('recordingStatus');
+            statusDiv.className = 'recording-status active';
+            statusDiv.textContent = `🔴 Recording in progress... Target: ${testUrl}`;
+            statusDiv.style.display = 'block';
+            
+            // Hide instructions and show actions panel
+            document.getElementById('recordingInstructions').style.display = 'none';
+            document.getElementById('recordedActions').style.display = 'block';
+            
+            // Open new window for recording
+            recordingWindow = window.open(testUrl, 'recorder', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+            
+            if (!recordingWindow) {
+                showStatus('Failed to open recording window. Please allow popups for this site.', 'error');
+                stopRecording();
+                return;
+            }
+
+            // Set up recording in the new window
+            recordingWindow.addEventListener('load', () => {
+                setupRecordingInWindow(recordingWindow);
+            });
+
+            // Monitor if window is closed
+            const checkClosed = setInterval(() => {
+                if (recordingWindow.closed) {
+                    clearInterval(checkClosed);
+                    if (isRecording) {
+                        stopRecording();
+                    }
+                }
+            }, 1000);
+
+            showStatus('Recording started! Perform your interactions in the opened window.', 'success');
+        }
+
+        function stopRecording() {
+            isRecording = false;
+            isPaused = false;
+            
+            // Close recording window if still open
+            if (recordingWindow && !recordingWindow.closed) {
+                recordingWindow.close();
+            }
+            
+            // Update UI
+            document.getElementById('startRecordingBtn').disabled = false;
+            document.getElementById('stopRecordingBtn').disabled = true;
+            document.getElementById('pauseRecordingBtn').disabled = true;
+            
+            // Update status
+            const statusDiv = document.getElementById('recordingStatus');
+            statusDiv.className = 'recording-status stopped';
+            statusDiv.textContent = `⏹️ Recording stopped. Captured ${recordedActions.length} actions.`;
+            
+            // Show instructions again
+            document.getElementById('recordingInstructions').style.display = 'block';
+            
+            showStatus(`Recording completed with ${recordedActions.length} actions`, 'success');
+            updateActionsDisplay();
+        }
+
+        function pauseRecording() {
+            if (isRecording) {
+                isPaused = !isPaused;
+                
+                const statusDiv = document.getElementById('recordingStatus');
+                const pauseBtn = document.getElementById('pauseRecordingBtn');
+                
+                if (isPaused) {
+                    statusDiv.className = 'recording-status paused';
+                    statusDiv.textContent = '⏸️ Recording paused';
+                    pauseBtn.textContent = '▶️ Resume Recording';
+                } else {
+                    statusDiv.className = 'recording-status active';
+                    statusDiv.textContent = '🔴 Recording in progress...';
+                    pauseBtn.textContent = '⏸️ Pause Recording';
+                }
+            }
+        }
+
+        function setupRecordingInWindow(win) {
+            try {
+                const doc = win.document;
+                
+                // Inject recording script into the window
+                const script = doc.createElement('script');
+                script.textContent = `
+                    (function() {
+                        let actionSequence = 0;
+                        
+                        function captureAction(type, target, value, description) {
+                            if (!window.opener || !window.opener.addRecordedAction) return;
+                            
+                            const selector = generateSelector(target);
+                            window.opener.addRecordedAction({
+                                type: type,
+                                selector: selector,
+                                locator: selector,
+                                value: value || '',
+                                description: description,
+                                timestamp: Date.now(),
+                                sequence: ++actionSequence
+                            });
+                        }
+                        
+                        function generateSelector(element) {
+                            if (element.id) {
+                                return '#' + element.id;
+                            }
+                            
+                            if (element.name) {
+                                return '[name="' + element.name + '"]';
+                            }
+                            
+                            if (element.textContent && element.textContent.trim()) {
+                                const text = element.textContent.trim().substring(0, 30);
+                                return 'text=' + text;
+                            }
+                            
+                            let selector = element.tagName.toLowerCase();
+                            if (element.className) {
+                                selector += '.' + element.className.split(' ').join('.');
+                            }
+                            
+                            return selector;
+                        }
+                        
+                        // Track clicks
+                        document.addEventListener('click', function(e) {
+                            if (window.opener && window.opener.isRecordingActive && !window.opener.isRecordingPaused) {
+                                const description = 'Click ' + (e.target.textContent ? e.target.textContent.trim().substring(0, 30) : e.target.tagName);
+                                captureAction('click', e.target, '', description);
+                            }
+                        }, true);
+                        
+                        // Track input changes
+                        document.addEventListener('input', function(e) {
+                            if (window.opener && window.opener.isRecordingActive && !window.opener.isRecordingPaused) {
+                                if (e.target.type === 'password') {
+                                    captureAction('input', e.target, '***', 'Enter password');
+                                } else {
+                                    captureAction('input', e.target, e.target.value, 'Enter text: ' + e.target.value.substring(0, 20));
+                                }
+                            }
+                        }, true);
+                        
+                        // Track form submissions
+                        document.addEventListener('submit', function(e) {
+                            if (window.opener && window.opener.isRecordingActive && !window.opener.isRecordingPaused) {
+                                captureAction('submit', e.target, '', 'Submit form');
+                            }
+                        }, true);
+                        
+                        // Track navigation
+                        let lastUrl = window.location.href;
+                        setInterval(function() {
+                            if (window.location.href !== lastUrl) {
+                                if (window.opener && window.opener.isRecordingActive && !window.opener.isRecordingPaused) {
+                                    window.opener.addRecordedAction({
+                                        type: 'navigate',
+                                        selector: '',
+                                        locator: '',
+                                        value: window.location.href,
+                                        description: 'Navigate to ' + window.location.href,
+                                        timestamp: Date.now(),
+                                        sequence: ++actionSequence
+                                    });
+                                }
+                                lastUrl = window.location.href;
+                            }
+                        }, 1000);
+                    })();
+                `;
+                
+                doc.head.appendChild(script);
+                
+                // Add visual indicator
+                const indicator = doc.createElement('div');
+                indicator.style.cssText = `
+                    position: fixed;
+                    top: 10px;
+                    right: 10px;
+                    background: #ff4444;
+                    color: white;
+                    padding: 10px;
+                    border-radius: 5px;
+                    z-index: 10000;
+                    font-family: Arial, sans-serif;
+                    font-size: 14px;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+                `;
+                indicator.textContent = '🔴 Recording in Progress';
+                doc.body.appendChild(indicator);
+                
+            } catch (error) {
+                console.error('Failed to setup recording in window:', error);
+                showStatus('Failed to setup recording. The target site may not allow recording.', 'error');
+            }
+        }
+
+        // Global functions for the recording window to call
+        window.addRecordedAction = function(action) {
+            if (isRecording && !isPaused) {
+                recordedActions.push(action);
+                updateActionsDisplay();
+            }
+        };
+
+        window.isRecordingActive = function() {
+            return isRecording;
+        };
+
+        window.isRecordingPaused = function() {
+            return isPaused;
+        };
+
+        function updateActionsDisplay() {
+            const actionsList = document.getElementById('actionsList');
+            actionsList.innerHTML = '';
+            
+            recordedActions.forEach((action, index) => {
+                const actionDiv = document.createElement('div');
+                actionDiv.className = 'action-item';
+                actionDiv.innerHTML = `
+                    <div class="action-details">
+                        <div class="action-type">${action.type.toUpperCase()}</div>
+                        <div class="action-target">${action.selector}</div>
+                        ${action.value ? `<div class="action-value">Value: ${action.value}</div>` : ''}
+                    </div>
+                    <button class="action-remove" onclick="removeAction(${index})">Remove</button>
+                `;
+                actionsList.appendChild(actionDiv);
+            });
+        }
+
+        function removeAction(index) {
+            recordedActions.splice(index, 1);
+            updateActionsDisplay();
+        }
+
+        function clearRecordedActions() {
+            recordedActions = [];
+            updateActionsDisplay();
+            document.getElementById('recordedActions').style.display = 'none';
+            document.getElementById('recordingInstructions').style.display = 'block';
+        }
+
+        function saveRecordedTest() {
+            const testName = document.getElementById('recordTestName').value.trim();
+            const testUrl = document.getElementById('recordTestUrl').value.trim();
+            const testDescription = document.getElementById('recordTestDescription').value.trim();
+            
+            if (!testName || !testUrl) {
+                showStatus('Please enter test name and URL', 'error');
+                return;
+            }
+            
+            if (recordedActions.length === 0) {
+                showStatus('No actions recorded. Please record some interactions first.', 'error');
+                return;
+            }
+            
+            // Convert recorded actions to test case format
+            const testCase = {
+                name: testName,
+                description: testDescription || `Recorded test case with ${recordedActions.length} actions`,
+                url: testUrl,
+                actions: recordedActions.map(action => ({
+                    type: action.type,
+                    locator: action.locator,
+                    value: action.value,
+                    description: action.description
+                }))
+            };
+            
+            // Save the test case
+            createTestCase(testCase);
         }
     </script>
 </body>
