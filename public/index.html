@@ -243,6 +243,240 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* Navigation Bar Styles */
+        .navbar {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 0.5rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            display: none;
+        }
+
+        .navbar.show {
+            display: block;
+        }
+
+        .navbar-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        .navbar-brand {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .navbar-nav {
+            display: flex;
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            gap: 2rem;
+        }
+
+        .nav-item {
+            position: relative;
+        }
+
+        .nav-link {
+            color: #333;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .nav-link:hover {
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+        }
+
+        .nav-link.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .dropdown {
+            position: relative;
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: white;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            min-width: 200px;
+            display: none;
+            z-index: 1001;
+        }
+
+        .dropdown-menu.show {
+            display: block;
+        }
+
+        .dropdown-item {
+            display: block;
+            padding: 0.75rem 1rem;
+            color: #333;
+            text-decoration: none;
+            border-bottom: 1px solid #f8f9fa;
+            cursor: pointer;
+        }
+
+        .dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .dropdown-item:hover {
+            background: #f8f9fa;
+        }
+
+        .mobile-menu-toggle {
+            display: none;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #333;
+        }
+
+        /* Settings Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 8px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 1rem;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .close-button {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .close-button:hover {
+            color: #333;
+        }
+
+        .timing-preset {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .timing-preset:hover {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.05);
+        }
+
+        .timing-preset.selected {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .range-slider {
+            width: 100%;
+            margin: 1rem 0;
+        }
+
+        /* Mobile Responsiveness */
+        @media (max-width: 768px) {
+            .navbar-nav {
+                display: none;
+                position: absolute;
+                top: 100%;
+                left: 0;
+                right: 0;
+                background: white;
+                border-top: 1px solid #eee;
+                flex-direction: column;
+                gap: 0;
+                padding: 1rem 0;
+            }
+
+            .navbar-nav.show {
+                display: flex;
+            }
+
+            .mobile-menu-toggle {
+                display: block;
+            }
+
+            .nav-item {
+                width: 100%;
+            }
+
+            .nav-link {
+                display: block;
+                padding: 1rem 2rem;
+                border-radius: 0;
+            }
+
+            .dropdown-menu {
+                position: static;
+                border: none;
+                box-shadow: none;
+                background: #f8f9fa;
+                margin-left: 2rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -252,6 +486,37 @@
             <p>Automate your web testing with Playwright and AI</p>
         </div>
     </div>
+
+    <!-- Navigation Bar (shown only when logged in) -->
+    <nav id="navbar" class="navbar">
+        <div class="navbar-content">
+            <a href="#" class="navbar-brand" onclick="scrollToSection('dashboard')">🤖 Testing Agent</a>
+            
+            <button class="mobile-menu-toggle" onclick="toggleMobileMenu()">☰</button>
+            
+            <ul class="navbar-nav" id="navbarNav">
+                <li class="nav-item">
+                    <a class="nav-link active" onclick="setActiveTab('dashboard')" href="#dashboard">Dashboard</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" onclick="setActiveTab('tests')" href="#tests">Test Cases</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" onclick="setActiveTab('results')" href="#results">Results</a>
+                </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link" onclick="toggleDropdown(event)">
+                        <span id="navbarUsername">User</span> ▼
+                    </a>
+                    <div class="dropdown-menu">
+                        <a class="dropdown-item" onclick="openSettings()">⚙️ Settings</a>
+                        <a class="dropdown-item" onclick="openProfile()">👤 Profile</a>
+                        <a class="dropdown-item" onclick="logout()">🚪 Logout</a>
+                    </div>
+                </li>
+            </ul>
+        </div>
+    </nav>
 
     <!-- Authentication Section -->
     <div id="authSection" class="auth-section">
@@ -433,15 +698,233 @@
         </div>
     </div>
 
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">⚙️ Settings</h3>
+                <button class="close-button" onclick="closeSettings()">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="interactionDelay">Interaction Delay Between Elements</label>
+                    <p style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
+                        Configure how long to wait between test interactions (in seconds)
+                    </p>
+                    
+                    <!-- Timing Presets -->
+                    <div class="timing-presets" style="margin-bottom: 1.5rem;">
+                        <div class="timing-preset" onclick="selectTimingPreset('fast', 1)">
+                            <div>
+                                <strong>⚡ Fast</strong>
+                                <div style="font-size: 0.9rem; color: #666;">1 second delay</div>
+                            </div>
+                            <div>1s</div>
+                        </div>
+                        <div class="timing-preset" onclick="selectTimingPreset('normal', 3)">
+                            <div>
+                                <strong>⏱️ Normal</strong>
+                                <div style="font-size: 0.9rem; color: #666;">3 seconds delay</div>
+                            </div>
+                            <div>3s</div>
+                        </div>
+                        <div class="timing-preset selected" onclick="selectTimingPreset('slow', 5)">
+                            <div>
+                                <strong>🐌 Slow</strong>
+                                <div style="font-size: 0.9rem; color: #666;">5 seconds delay (default)</div>
+                            </div>
+                            <div>5s</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Custom Timing Slider -->
+                    <div class="form-group">
+                        <label for="customDelaySlider">Custom Delay: <span id="delayValue">5</span> seconds</label>
+                        <input 
+                            type="range" 
+                            id="customDelaySlider" 
+                            class="range-slider" 
+                            min="0.5" 
+                            max="10" 
+                            step="0.5" 
+                            value="5"
+                            oninput="updateDelayValue(this.value)"
+                        >
+                        <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #666;">
+                            <span>0.5s</span>
+                            <span>5s</span>
+                            <span>10s</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="enableVisualIndicators" checked> 
+                        Enable Visual Interaction Indicators
+                    </label>
+                    <p style="font-size: 0.9rem; color: #666; margin-top: 0.5rem;">
+                        Show green borders and labels during test interactions
+                    </p>
+                </div>
+                
+                <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+                    <button onclick="saveSettings()" class="btn-success">Save Settings</button>
+                    <button onclick="resetSettings()" class="btn-secondary">Reset to Default</button>
+                    <button onclick="closeSettings()" class="btn-secondary">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         let authToken = localStorage.getItem('authToken');
         let currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
         let lastParsedTest = null;
 
+        // Settings variables
+        let interactionDelay = parseInt(localStorage.getItem('interactionDelay') || '5');
+        let enableVisualIndicators = localStorage.getItem('enableVisualIndicators') !== 'false';
+
+        // Navigation functions
+        function showNavbar() {
+            document.getElementById('navbar').classList.add('show');
+            if (currentUser.username) {
+                document.getElementById('navbarUsername').textContent = currentUser.username;
+            }
+        }
+
+        function hideNavbar() {
+            document.getElementById('navbar').classList.remove('show');
+        }
+
+        function toggleMobileMenu() {
+            const nav = document.getElementById('navbarNav');
+            nav.classList.toggle('show');
+        }
+
+        function toggleDropdown(event) {
+            event.preventDefault();
+            const dropdown = event.target.closest('.dropdown');
+            const menu = dropdown.querySelector('.dropdown-menu');
+            menu.classList.toggle('show');
+            
+            // Close dropdown when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!dropdown.contains(e.target)) {
+                    menu.classList.remove('show');
+                }
+            }, { once: true });
+        }
+
+        function setActiveTab(tabName) {
+            // Remove active class from all nav links
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+            
+            // Add active class to clicked link
+            event.target.classList.add('active');
+            
+            // Scroll to section
+            scrollToSection(tabName);
+        }
+
+        function scrollToSection(sectionId) {
+            const element = document.getElementById(sectionId === 'dashboard' ? 'mainContent' : 
+                                                 sectionId === 'tests' ? 'testCasesList' :
+                                                 sectionId === 'results' ? 'testResultsList' : 'mainContent');
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        // Settings functions
+        function openSettings() {
+            document.getElementById('settingsModal').classList.add('show');
+            // Load current settings
+            document.getElementById('customDelaySlider').value = interactionDelay;
+            document.getElementById('delayValue').textContent = interactionDelay;
+            document.getElementById('enableVisualIndicators').checked = enableVisualIndicators;
+            
+            // Update preset selection
+            updatePresetSelection();
+        }
+
+        function closeSettings() {
+            document.getElementById('settingsModal').classList.remove('show');
+        }
+
+        function openProfile() {
+            alert('Profile management coming soon!');
+        }
+
+        function selectTimingPreset(preset, seconds) {
+            // Remove selected class from all presets
+            document.querySelectorAll('.timing-preset').forEach(p => {
+                p.classList.remove('selected');
+            });
+            
+            // Add selected class to clicked preset
+            event.currentTarget.classList.add('selected');
+            
+            // Update slider and display
+            document.getElementById('customDelaySlider').value = seconds;
+            document.getElementById('delayValue').textContent = seconds;
+        }
+
+        function updateDelayValue(value) {
+            document.getElementById('delayValue').textContent = value;
+            
+            // Update preset selection based on value
+            updatePresetSelection();
+        }
+
+        function updatePresetSelection() {
+            const value = parseFloat(document.getElementById('customDelaySlider').value);
+            document.querySelectorAll('.timing-preset').forEach(p => {
+                p.classList.remove('selected');
+            });
+            
+            if (value === 1) {
+                document.querySelector('.timing-preset:nth-child(1)').classList.add('selected');
+            } else if (value === 3) {
+                document.querySelector('.timing-preset:nth-child(2)').classList.add('selected');
+            } else if (value === 5) {
+                document.querySelector('.timing-preset:nth-child(3)').classList.add('selected');
+            }
+        }
+
+        function saveSettings() {
+            // Save interaction delay
+            interactionDelay = parseFloat(document.getElementById('customDelaySlider').value);
+            localStorage.setItem('interactionDelay', interactionDelay.toString());
+            
+            // Save visual indicators setting
+            enableVisualIndicators = document.getElementById('enableVisualIndicators').checked;
+            localStorage.setItem('enableVisualIndicators', enableVisualIndicators.toString());
+            
+            // Show success message
+            alert(`Settings saved! Interaction delay: ${interactionDelay}s, Visual indicators: ${enableVisualIndicators ? 'enabled' : 'disabled'}`);
+            
+            closeSettings();
+        }
+
+        function resetSettings() {
+            // Reset to defaults
+            document.getElementById('customDelaySlider').value = 5;
+            document.getElementById('delayValue').textContent = '5';
+            document.getElementById('enableVisualIndicators').checked = true;
+            
+            updatePresetSelection();
+        }
+
         // Initialize app
         document.addEventListener('DOMContentLoaded', function() {
             if (authToken) {
                 showMainContent();
+                showNavbar();
                 checkBrowserStatus();
                 loadTestCases();
                 loadTestResults();
@@ -531,17 +1014,20 @@
             localStorage.removeItem('currentUser');
             authToken = null;
             currentUser = {};
+            hideNavbar();
             showAuthSection();
         }
 
         function showAuthSection() {
             document.getElementById('authSection').style.display = 'block';
             document.getElementById('mainContent').style.display = 'none';
+            hideNavbar();
         }
 
         function showMainContent() {
             document.getElementById('authSection').style.display = 'none';
             document.getElementById('mainContent').style.display = 'block';
+            showNavbar();
         }
 
         // Utility functions
@@ -776,7 +1262,11 @@
                 
                 const response = await apiCall(`/api/test/execute/${testId}`, {
                     method: 'POST',
-                    body: JSON.stringify({ browserType, headless })
+                    body: JSON.stringify({ 
+                        browserType, 
+                        headless, 
+                        interactionDelay 
+                    })
                 });
 
                 const result = await response.json();
@@ -1011,7 +1501,8 @@
                         browserType, 
                         headless, 
                         parallel, 
-                        maxConcurrency 
+                        maxConcurrency,
+                        interactionDelay 
                     })
                 });
 

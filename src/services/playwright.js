@@ -43,7 +43,8 @@ class PlaywrightTestService {
         }
     }
 
-    async runTest(testCase) {
+    async runTest(testCase, options = {}) {
+        const { interactionDelay = 5 } = options;
         const startTime = Date.now();
         let result = {
             status: 'success',
@@ -76,9 +77,9 @@ class PlaywrightTestService {
                             timestamp: new Date().toISOString()
                         });
                         
-                        // Add 5-second delay between interactions (except after the last action)
+                        // Add configurable delay between interactions (except after the last action)
                         if (i < testCase.actions.length - 1) {
-                            await this.page.waitForTimeout(5000);
+                            await this.page.waitForTimeout(interactionDelay * 1000);
                         }
                     } catch (stepError) {
                         const stepDescription = action.description || `${action.type} on ${action.locator || action.selector || action.target}`;
