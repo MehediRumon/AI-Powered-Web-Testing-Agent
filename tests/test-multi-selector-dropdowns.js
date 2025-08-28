@@ -239,7 +239,7 @@ async function testProblemStatementCases() {
                 name: 'Teacher Grade - Level-01',
                 action: {
                     type: 'select',
-                    selector: '#teachergrade, #teachergradeType, select[name=teachergrade], select[name=teachergradeType]',
+                    selector: '#teachergrade',
                     value: 'Level-01',
                     description: 'Select \'Level-01\' from the Teacher Grade dropdown'
                 }
@@ -248,7 +248,7 @@ async function testProblemStatementCases() {
                 name: 'Religion - Islam',
                 action: {
                     type: 'select',
-                    selector: '#religion, #religionType, select[name=religion], select[name=religionType]',
+                    selector: '#religion',
                     value: 'Islam',
                     description: 'Select \'Islam\' from the Religion dropdown'
                 }

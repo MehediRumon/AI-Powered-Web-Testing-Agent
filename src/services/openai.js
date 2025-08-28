@@ -307,12 +307,12 @@ Example output:
                 
                 // Teacher grade specific patterns
                 if (fieldName.includes('teacher grade') || fieldName.includes('teachergrade')) {
-                    return '#teachergrade, #teachergradeType, select[name=teachergrade], select[name=teachergradeType]';
+                    return '#teachergrade';
                 }
                 
                 // Religion specific patterns
                 if (fieldName.includes('religion')) {
-                    return '#religion, #religionType, select[name=religion], select[name=religionType]';
+                    return '#religion';
                 }
                 
                 // Other common patterns
