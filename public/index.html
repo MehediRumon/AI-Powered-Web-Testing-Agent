@@ -1963,21 +1963,64 @@
                 const script = doc.createElement('script');
                 script.textContent = `
                     (function() {
+                        console.log('Recording script initialized on:', window.location.href);
                         let actionSequence = 0;
                         
-                        function captureAction(type, target, value, description) {
-                            if (!window.opener || !window.opener.addRecordedAction) return;
+                        // Wait for DOM to be ready
+                        function initRecording() {
+                            console.log('Recording: DOM ready, setting up event listeners');
                             
-                            const selector = generateSelector(target);
-                            window.opener.addRecordedAction({
-                                type: type,
-                                selector: selector,
-                                locator: selector,
-                                value: value || '',
-                                description: description,
-                                timestamp: Date.now(),
-                                sequence: ++actionSequence
-                            });
+                            // Verify opener connection
+                            if (window.opener) {
+                                console.log('Recording: window.opener available');
+                                if (typeof window.opener.isRecordingActive === 'function') {
+                                    console.log('Recording: isRecordingActive function found');
+                                } else {
+                                    console.error('Recording: isRecordingActive function not found');
+                                }
+                                if (typeof window.opener.addRecordedAction === 'function') {
+                                    console.log('Recording: addRecordedAction function found');
+                                } else {
+                                    console.error('Recording: addRecordedAction function not found');
+                                }
+                            } else {
+                                console.error('Recording: window.opener not available');
+                            }
+                        }
+                        
+                        if (document.readyState === 'loading') {
+                            document.addEventListener('DOMContentLoaded', initRecording);
+                        } else {
+                            initRecording();
+                        }
+                        
+                        function captureAction(type, target, value, description) {
+                            try {
+                                if (!window.opener) {
+                                    console.error('Recording: window.opener is not available');
+                                    return;
+                                }
+                                
+                                if (!window.opener.addRecordedAction) {
+                                    console.error('Recording: addRecordedAction function not found in opener');
+                                    return;
+                                }
+                                
+                                const selector = generateSelector(target);
+                                console.log('Recording action:', { type, selector, value, description });
+                                
+                                window.opener.addRecordedAction({
+                                    type: type,
+                                    selector: selector,
+                                    locator: selector,
+                                    value: value || '',
+                                    description: description,
+                                    timestamp: Date.now(),
+                                    sequence: ++actionSequence
+                                });
+                            } catch (error) {
+                                console.error('Recording: Failed to capture action:', error);
+                            }
                         }
                         
                         function generateSelector(element) {
@@ -2004,46 +2047,62 @@
                         
                         // Track clicks
                         document.addEventListener('click', function(e) {
-                            if (window.opener && window.opener.isRecordingActive && !window.opener.isRecordingPaused) {
-                                const description = 'Click ' + (e.target.textContent ? e.target.textContent.trim().substring(0, 30) : e.target.tagName);
-                                captureAction('click', e.target, '', description);
+                            try {
+                                if (window.opener && window.opener.isRecordingActive() && !window.opener.isRecordingPaused()) {
+                                    const description = 'Click ' + (e.target.textContent ? e.target.textContent.trim().substring(0, 30) : e.target.tagName);
+                                    captureAction('click', e.target, '', description);
+                                }
+                            } catch (error) {
+                                console.error('Recording: Click tracking failed:', error);
                             }
                         }, true);
                         
                         // Track input changes
                         document.addEventListener('input', function(e) {
-                            if (window.opener && window.opener.isRecordingActive && !window.opener.isRecordingPaused) {
-                                if (e.target.type === 'password') {
-                                    captureAction('input', e.target, '***', 'Enter password');
-                                } else {
-                                    captureAction('input', e.target, e.target.value, 'Enter text: ' + e.target.value.substring(0, 20));
+                            try {
+                                if (window.opener && window.opener.isRecordingActive() && !window.opener.isRecordingPaused()) {
+                                    if (e.target.type === 'password') {
+                                        captureAction('input', e.target, '***', 'Enter password');
+                                    } else {
+                                        captureAction('input', e.target, e.target.value, 'Enter text: ' + e.target.value.substring(0, 20));
+                                    }
                                 }
+                            } catch (error) {
+                                console.error('Recording: Input tracking failed:', error);
                             }
                         }, true);
                         
                         // Track form submissions
                         document.addEventListener('submit', function(e) {
-                            if (window.opener && window.opener.isRecordingActive && !window.opener.isRecordingPaused) {
-                                captureAction('submit', e.target, '', 'Submit form');
+                            try {
+                                if (window.opener && window.opener.isRecordingActive() && !window.opener.isRecordingPaused()) {
+                                    captureAction('submit', e.target, '', 'Submit form');
+                                }
+                            } catch (error) {
+                                console.error('Recording: Submit tracking failed:', error);
                             }
                         }, true);
                         
                         // Track navigation
                         let lastUrl = window.location.href;
                         setInterval(function() {
-                            if (window.location.href !== lastUrl) {
-                                if (window.opener && window.opener.isRecordingActive && !window.opener.isRecordingPaused) {
-                                    window.opener.addRecordedAction({
-                                        type: 'navigate',
-                                        selector: '',
-                                        locator: '',
-                                        value: window.location.href,
-                                        description: 'Navigate to ' + window.location.href,
-                                        timestamp: Date.now(),
-                                        sequence: ++actionSequence
-                                    });
+                            try {
+                                if (window.location.href !== lastUrl) {
+                                    if (window.opener && window.opener.isRecordingActive() && !window.opener.isRecordingPaused()) {
+                                        window.opener.addRecordedAction({
+                                            type: 'navigate',
+                                            selector: '',
+                                            locator: '',
+                                            value: window.location.href,
+                                            description: 'Navigate to ' + window.location.href,
+                                            timestamp: Date.now(),
+                                            sequence: ++actionSequence
+                                        });
+                                    }
+                                    lastUrl = window.location.href;
                                 }
-                                lastUrl = window.location.href;
+                            } catch (error) {
+                                console.error('Recording: Navigation tracking failed:', error);
                             }
                         }, 1000);
                     })();
