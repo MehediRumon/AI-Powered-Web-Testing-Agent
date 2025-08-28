@@ -36,13 +36,13 @@ Select 'Islam' from the Religion dropdown
             },
             {
                 type: 'select',
-                selector: '#teachergrade',
+                selector: '#teachergrade, #teachergradeType, select[name="teachergrade"], select[name="teachergradeType"]',
                 value: 'Level-01',
                 description: "Select 'Level-01' from the Teacher Grade dropdown"
             },
             {
                 type: 'select',
-                selector: '#religion',
+                selector: '#religion, #religionType, select[name="religion"], select[name="religionType"]',
                 value: 'Islam',
                 description: "Select 'Islam' from the Religion dropdown"
             }
