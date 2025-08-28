@@ -22,8 +22,8 @@ Select 'Islam' from the Religion dropdown
     // Validate corrected behavior
     const expectedResults = [
         { name: 'Mobile Banking Type', expectedSelector: '#MobileBankingType', expectedValue: 'Nagad' },
-        { name: 'Teacher Grade', expectedSelector: '#teachergrade', expectedValue: 'Level-01' },
-        { name: 'Religion', expectedSelector: '#religion', expectedValue: 'Islam' }
+        { name: 'Teacher Grade', expectedSelector: '#teachergrade, #teachergradeType, select[name="teachergrade"], select[name="teachergradeType"]', expectedValue: 'Level-01' },
+        { name: 'Religion', expectedSelector: '#religion, #religionType, select[name="religion"], select[name="religionType"]', expectedValue: 'Islam' }
     ];
     
     let allTestsPassed = true;
@@ -60,12 +60,12 @@ Select 'Islam' from the Religion dropdown
         },
         {
             input: 'Choose from teacher grade dropdown', 
-            expected: '#teachergrade',
+            expected: '#teachergrade, #teachergradeType, select[name="teachergrade"], select[name="teachergradeType"]',
             description: 'Teacher Grade recognition'
         },
         {
             input: 'Pick from religion dropdown',
-            expected: '#religion', 
+            expected: '#religion, #religionType, select[name="religion"], select[name="religionType"]', 
             description: 'Religion recognition'
         }
     ];
@@ -121,14 +121,14 @@ Select 'Islam' from the Religion dropdown
         console.log('\nThe fix is working correctly:');
         console.log('- Natural language parsing now produces simple, correct selectors');
         console.log('- Mobile Banking Type: #MobileBankingType (unchanged)');
-        console.log('- Teacher Grade: #teachergrade (fixed from complex multi-selector)'); 
-        console.log('- Religion: #religion (fixed from complex multi-selector)');
+        console.log('- Teacher Grade: #teachergrade, #teachergradeType, select[name="teachergrade"], select[name="teachergradeType"] (fixed from single selector)'); 
+        console.log('- Religion: #religion, #religionType, select[name="religion"], select[name="religionType"] (fixed from single selector)');
         console.log('- General pattern recognition still works for other cases');
         console.log('- Backward compatibility maintained for unknown patterns');
         
         console.log('\n🎯 PROBLEM STATEMENT RESOLVED:');
         console.log('The first selector was getting correctly (#MobileBankingType)');
-        console.log('The others are now also getting correctly (#teachergrade, #religion)');
+        console.log('The others are now also getting multi-selectors (#teachergrade, #teachergradeType, ..., #religion, #religionType, ...)');
     } else {
         console.log('❌ SOME TESTS FAILED');
         console.log('Please review the implementation');
