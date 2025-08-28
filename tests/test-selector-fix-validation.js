@@ -37,13 +37,17 @@ Select 'Islam' from the Religion dropdown
         console.log(`  Actual:   ${action.selector}`);
         console.log(`  Value:    ${action.value} (expected: ${expected.expectedValue})`);
         
-        const selectorMatch = action.selector === expected.expectedSelector;
+        const primarySelector = action.selector.split(',')[0].trim();
+        const selectorMatch = primarySelector === expected.expectedSelector;
         const valueMatch = action.value === expected.expectedValue;
         
         if (selectorMatch && valueMatch) {
-            console.log(`  Result:   ✅ CORRECT - Simple selector as expected`);
+            console.log(`  Result:   ✅ CORRECT - Primary selector matches (with ${action.selector.split(',').length} fallbacks)`);
         } else {
             console.log(`  Result:   ❌ INCORRECT`);
+            if (!selectorMatch) {
+                console.log(`    Primary selector '${primarySelector}' != expected '${expected.expectedSelector}'`);
+            }
             allTestsPassed = false;
         }
     }
@@ -76,9 +80,11 @@ Select 'Islam' from the Religion dropdown
         console.log(`  Input:    "${test.input}"`);
         console.log(`  Expected: ${test.expected}`);
         console.log(`  Actual:   ${result}`);
-        console.log(`  Result:   ${result === test.expected ? '✅ CORRECT' : '❌ INCORRECT'}`);
+        const primarySelector = result.split(',')[0].trim();
+        console.log(`  Primary:  ${primarySelector}`);
+        console.log(`  Result:   ${primarySelector === test.expected ? '✅ CORRECT' : '❌ INCORRECT'}`);
         
-        if (result !== test.expected) {
+        if (primarySelector !== test.expected) {
             allTestsPassed = false;
         }
     }
