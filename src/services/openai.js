@@ -324,6 +324,15 @@ class OpenAIService {
             if (this.apiKey) {
                 return await this.analyzeScreenshotWithAI(url, screenshotPath);
             } else {
+                // Clean up screenshot file if AI analysis is not available
+                if (screenshotPath && fs.existsSync(screenshotPath)) {
+                    try {
+                        fs.unlinkSync(screenshotPath);
+                    } catch (unlinkError) {
+                        console.error('Failed to clean up screenshot:', unlinkError);
+                    }
+                }
+                
                 // Fallback: Generate basic test case without AI analysis
                 return this.generateBasicTestFromURL(url);
             }
