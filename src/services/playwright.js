@@ -24,10 +24,28 @@ class PlaywrightTestService {
                     browserInstance = chromium;
             }
 
-            this.browser = await browserInstance.launch({ 
-                headless,
-                args: ['--no-sandbox', '--disable-setuid-sandbox'] // For Docker/CI environments
-            });
+            // Try to launch browser with fallback to system browser
+            try {
+                this.browser = await browserInstance.launch({ 
+                    headless,
+                    args: ['--no-sandbox', '--disable-setuid-sandbox'] // For Docker/CI environments
+                });
+            } catch (launchError) {
+                console.warn('Failed to launch Playwright browser, trying system browser:', launchError.message);
+                
+                // Try to use system browser
+                this.browser = await browserInstance.launch({ 
+                    headless,
+                    executablePath: '/usr/bin/chromium-browser', // System chromium path
+                    args: [
+                        '--no-sandbox', 
+                        '--disable-setuid-sandbox',
+                        '--disable-dev-shm-usage',
+                        '--disable-extensions',
+                        '--disable-gpu'
+                    ]
+                });
+            }
             
             this.context = await this.browser.newContext({
                 viewport: { width: 1280, height: 720 },
