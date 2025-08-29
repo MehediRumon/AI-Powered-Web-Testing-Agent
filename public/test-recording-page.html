@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Page for Recording</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            background: #f4f4f4;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        input, select, button {
+            margin: 5px;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Test Page for Recording</h1>
+        <p>This page is used to test the recording functionality.</p>
+        
+        <div class="form-group">
+            <label for="name">Name:</label>
+            <input type="text" id="name" name="name" placeholder="Enter your name">
+        </div>
+        
+        <div class="form-group">
+            <label for="email">Email:</label>
+            <input type="email" id="email" name="email" placeholder="Enter your email">
+        </div>
+        
+        <div class="form-group">
+            <label for="country">Country:</label>
+            <select id="country" name="country">
+                <option value="">Select Country</option>
+                <option value="us">United States</option>
+                <option value="uk">United Kingdom</option>
+                <option value="ca">Canada</option>
+                <option value="au">Australia</option>
+            </select>
+        </div>
+        
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="newsletter" name="newsletter">
+                Subscribe to newsletter
+            </label>
+        </div>
+        
+        <div class="form-group">
+            <label>
+                <input type="radio" name="gender" value="male">
+                Male
+            </label>
+            <label>
+                <input type="radio" name="gender" value="female">
+                Female
+            </label>
+        </div>
+        
+        <div class="form-group">
+            <button type="button" id="submitBtn">Submit Form</button>
+            <button type="button" id="clearBtn">Clear Form</button>
+        </div>
+        
+        <div id="result" style="margin-top: 20px; padding: 10px; background: #e7f3ff; display: none;">
+            <h3>Form Submitted!</h3>
+            <p id="resultText"></p>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('submitBtn').addEventListener('click', function() {
+            const name = document.getElementById('name').value;
+            const email = document.getElementById('email').value;
+            const country = document.getElementById('country').value;
+            const newsletter = document.getElementById('newsletter').checked;
+            const gender = document.querySelector('input[name="gender"]:checked')?.value || 'Not specified';
+            
+            const resultText = `
+                Name: ${name}<br>
+                Email: ${email}<br>
+                Country: ${country}<br>
+                Newsletter: ${newsletter ? 'Yes' : 'No'}<br>
+                Gender: ${gender}
+            `;
+            
+            document.getElementById('resultText').innerHTML = resultText;
+            document.getElementById('result').style.display = 'block';
+        });
+        
+        document.getElementById('clearBtn').addEventListener('click', function() {
+            document.getElementById('name').value = '';
+            document.getElementById('email').value = '';
+            document.getElementById('country').value = '';
+            document.getElementById('newsletter').checked = false;
+            const radios = document.querySelectorAll('input[name="gender"]');
+            radios.forEach(radio => radio.checked = false);
+            document.getElementById('result').style.display = 'none';
+        });
+    </script>
+</body>
+</html>
