@@ -2055,9 +2055,6 @@
             document.getElementById('stopRecordingBtn').disabled = true;
             document.getElementById('pauseRecordingBtn').disabled = true;
             
-            // Final cleanup to remove exact duplicates
-            cleanupDuplicateActions();
-            
             // Update status
             const statusDiv = document.getElementById('recordingStatus');
             statusDiv.className = 'recording-status stopped';
@@ -2141,7 +2138,7 @@
                         
                         // Action deduplication tracking
                         let recentActions = new Map(); // selector -> {type, timestamp, value}
-                        const DEDUP_WINDOW = 1000; // 1000ms window for deduplication (increased from 500ms)
+                        const DEDUP_WINDOW = 500; // 500ms window for deduplication
                         
                         // Enhanced function to capture actions with deduplication and filtering
                         function captureAction(type, target, value, description) {
@@ -2422,7 +2419,7 @@
                                                 }
                                             }
                                             inputTimeouts.delete(selector);
-                                        }, 750); // Increased debounce to 750ms for better deduplication
+                                        }, 500); // Increased debounce to 500ms
                                         
                                         inputTimeouts.set(selector, timeout);
                                     }
@@ -2598,83 +2595,44 @@
             }
         };
 
-        // Enhanced deduplication logic to prevent duplicate actions
+        // Simple and effective deduplication logic
         function shouldIncludeAction(newAction) {
             // For the first action, always include it
             if (recordedActions.length === 0) {
                 return true;
             }
             
-            // Check last few actions for duplicates (not just the last one)
-            const recentActions = recordedActions.slice(-3); // Check last 3 actions
+            // Get the most recent action
+            const lastAction = recordedActions[recordedActions.length - 1];
             
-            for (const recentAction of recentActions) {
-                // Skip exact duplicates (same type, selector, and value)
-                if (recentAction.type === newAction.type && 
-                    recentAction.selector === newAction.selector && 
-                    recentAction.value === newAction.value) {
-                    console.log('Skipping exact duplicate action:', newAction.type, newAction.selector);
+            // If it's the same selector within 1 second, apply filtering rules
+            if (lastAction.selector === newAction.selector && 
+                newAction.timestamp - lastAction.timestamp < 1000) {
+                
+                // For SELECT elements: keep SELECT, skip INPUT
+                if (lastAction.type === 'select' && newAction.type === 'input') {
                     return false;
                 }
                 
-                // Skip near-duplicate input actions on the same element within 2 seconds
-                if (recentAction.selector === newAction.selector && 
-                    newAction.timestamp - recentAction.timestamp < 2000) {
-                    
-                    // For input fields: keep only the latest value for the same element
-                    if (recentAction.type === 'input' && newAction.type === 'input') {
-                        console.log('Skipping duplicate input action:', newAction.selector);
-                        return false;
-                    }
-                    
-                    // For SELECT elements: keep SELECT, skip INPUT
-                    if (recentAction.type === 'select' && newAction.type === 'input') {
-                        console.log('Skipping input after select:', newAction.selector);
-                        return false;
-                    }
-                    
-                    // For checkboxes: keep CHECKBOX/change events, skip INPUT events
-                    if ((recentAction.type === 'checkbox' || recentAction.type === 'change') && newAction.type === 'input') {
-                        console.log('Skipping input after checkbox:', newAction.selector);
-                        return false;
-                    }
-                    
-                    // Skip click events on form elements if we have a more specific action
-                    if ((recentAction.type === 'input' || recentAction.type === 'checkbox' || recentAction.type === 'select') && 
-                        newAction.type === 'click') {
-                        console.log('Skipping click after form action:', newAction.selector);
-                        return false;
-                    }
+                // For checkboxes: keep CHECKBOX, skip INPUT events with value 'on'
+                if (lastAction.type === 'checkbox' && newAction.type === 'input' && 
+                    (newAction.value === 'on' || newAction.value === true)) {
+                    return false;
+                }
+                
+                // Skip click events on form elements if we have a more specific action
+                if ((lastAction.type === 'input' || lastAction.type === 'checkbox' || lastAction.type === 'select') && 
+                    newAction.type === 'click') {
+                    return false;
+                }
+                
+                // Skip exact duplicates
+                if (lastAction.type === newAction.type && lastAction.value === newAction.value) {
+                    return false;
                 }
             }
             
             return true;
-        }
-
-        // Final cleanup function to remove exact duplicate actions
-        function cleanupDuplicateActions() {
-            const uniqueActions = [];
-            const seen = new Set();
-            
-            for (const action of recordedActions) {
-                // Create a unique key based on action properties
-                const key = `${action.type}:${action.selector}:${action.value}`;
-                
-                if (!seen.has(key)) {
-                    seen.add(key);
-                    uniqueActions.push(action);
-                } else {
-                    console.log('Removing duplicate action in final cleanup:', action.type, action.selector);
-                }
-            }
-            
-            // If we removed duplicates, update the array
-            if (uniqueActions.length !== recordedActions.length) {
-                const removedCount = recordedActions.length - uniqueActions.length;
-                recordedActions.splice(0, recordedActions.length, ...uniqueActions);
-                updateActionsDisplay();
-                console.log(`Final cleanup: Removed ${removedCount} duplicate actions`);
-            }
         }
 
 
