@@ -525,6 +525,104 @@
             display: block;
         }
 
+        /* Live View Panel Styles */
+        .live-view-panel {
+            margin: 1rem 0;
+            padding: 1rem;
+            border: 2px solid #28a745;
+            border-radius: 8px;
+            background: #f8fff9;
+        }
+
+        .live-view-panel h5 {
+            margin: 0 0 1rem 0;
+            color: #155724;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .live-stats {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .live-stats span {
+            background: #e2f3e4;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            border: 1px solid #c3e6cb;
+        }
+
+        .live-actions-preview {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            background: white;
+        }
+
+        .live-action-placeholder {
+            padding: 2rem;
+            text-align: center;
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        .live-action-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background-color 0.2s;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .live-action-item:hover {
+            background-color: #f8f9fa;
+        }
+
+        .live-action-item:last-child {
+            border-bottom: none;
+        }
+
+        .live-action-type {
+            background: #007bff;
+            color: white;
+            padding: 0.125rem 0.375rem;
+            border-radius: 3px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .live-action-description {
+            flex: 1;
+            font-size: 0.875rem;
+        }
+
+        .live-action-time {
+            font-size: 0.75rem;
+            color: #6c757d;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
         .recorded-actions {
             margin-top: 2rem;
             border: 1px solid #ddd;
@@ -819,6 +917,19 @@
                                 </div>
                                 
                                 <div id="recordingStatus" class="recording-status"></div>
+                                
+                                <!-- Live View Panel -->
+                                <div id="liveViewPanel" class="live-view-panel" style="display: none;">
+                                    <h5>🔴 Live Recording View</h5>
+                                    <div class="live-stats">
+                                        <span>Actions: <span id="liveActionCount">0</span></span>
+                                        <span>Duration: <span id="liveDuration">00:00</span></span>
+                                        <span>Status: <span id="liveStatus">Recording...</span></span>
+                                    </div>
+                                    <div class="live-actions-preview" id="liveActionsPreview">
+                                        <div class="live-action-placeholder">Perform actions on the target page to see them here...</div>
+                                    </div>
+                                </div>
                                 
                                 <div id="recordedActions" class="recorded-actions" style="display: none;">
                                     <h5>Recorded Actions:</h5>
@@ -1845,6 +1956,7 @@
         let recordedActions = [];
         let recordingWindow = null;
         let recordingStartTime = null;
+        let liveDurationTimer = null;
 
         function startRecording() {
             const testName = document.getElementById('recordTestName').value.trim();
@@ -1879,9 +1991,22 @@
             statusDiv.textContent = `🔴 Recording in progress... Target: ${testUrl}`;
             statusDiv.style.display = 'block';
             
+            // Show live view panel
+            const liveViewPanel = document.getElementById('liveViewPanel');
+            liveViewPanel.style.display = 'block';
+            document.getElementById('liveActionCount').textContent = '0';
+            document.getElementById('liveStatus').textContent = 'Recording...';
+            
+            // Start live duration timer
+            startLiveDurationTimer();
+            
             // Hide instructions and show actions panel
             document.getElementById('recordingInstructions').style.display = 'none';
             document.getElementById('recordedActions').style.display = 'block';
+            
+            // Clear live preview
+            const livePreview = document.getElementById('liveActionsPreview');
+            livePreview.innerHTML = '<div class="live-action-placeholder">Perform actions on the target page to see them here...</div>';
             
             // Open new window for recording
             recordingWindow = window.open(testUrl, 'recorder', 'width=1200,height=800,scrollbars=yes,resizable=yes');
@@ -1914,6 +2039,12 @@
             isRecording = false;
             isPaused = false;
             
+            // Stop live duration timer
+            if (liveDurationTimer) {
+                clearInterval(liveDurationTimer);
+                liveDurationTimer = null;
+            }
+            
             // Close recording window if still open
             if (recordingWindow && !recordingWindow.closed) {
                 recordingWindow.close();
@@ -1929,6 +2060,9 @@
             statusDiv.className = 'recording-status stopped';
             statusDiv.textContent = `⏹️ Recording stopped. Captured ${recordedActions.length} actions.`;
             
+            // Hide live view panel
+            document.getElementById('liveViewPanel').style.display = 'none';
+            
             // Show instructions again
             document.getElementById('recordingInstructions').style.display = 'block';
             
@@ -1942,32 +2076,194 @@
                 
                 const statusDiv = document.getElementById('recordingStatus');
                 const pauseBtn = document.getElementById('pauseRecordingBtn');
+                const liveStatus = document.getElementById('liveStatus');
                 
                 if (isPaused) {
                     statusDiv.className = 'recording-status paused';
                     statusDiv.textContent = '⏸️ Recording paused';
                     pauseBtn.textContent = '▶️ Resume Recording';
+                    liveStatus.textContent = 'Paused';
+                    
+                    // Pause live duration timer
+                    if (liveDurationTimer) {
+                        clearInterval(liveDurationTimer);
+                        liveDurationTimer = null;
+                    }
                 } else {
                     statusDiv.className = 'recording-status active';
                     statusDiv.textContent = '🔴 Recording in progress...';
                     pauseBtn.textContent = '⏸️ Pause Recording';
+                    liveStatus.textContent = 'Recording...';
+                    
+                    // Resume live duration timer
+                    startLiveDurationTimer();
                 }
             }
+        }
+
+        function startLiveDurationTimer() {
+            if (liveDurationTimer) {
+                clearInterval(liveDurationTimer);
+            }
+            
+            liveDurationTimer = setInterval(() => {
+                if (isRecording && !isPaused && recordingStartTime) {
+                    const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+                    const minutes = Math.floor(elapsed / 60);
+                    const seconds = elapsed % 60;
+                    const timeString = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                    document.getElementById('liveDuration').textContent = timeString;
+                }
+            }, 1000);
         }
 
         function setupRecordingInWindow(win) {
             try {
                 const doc = win.document;
                 
-                // Inject recording script into the window
-                const script = doc.createElement('script');
-                script.textContent = `
+                // Wait for document to be ready before injecting script
+                const waitForDocumentReady = () => {
+                    if (doc.readyState === 'loading') {
+                        setTimeout(waitForDocumentReady, 100);
+                        return;
+                    }
+                    
+                    // Inject recording script into the window
+                    const script = doc.createElement('script');
+                    script.textContent = `
                     (function() {
                         console.log('Recording script initialized on:', window.location.href);
                         let actionSequence = 0;
+                        let setupComplete = false;
                         
-                        // Wait for DOM to be ready
+                        // Enhanced function to capture actions with better error handling
+                        function captureAction(type, target, value, description) {
+                            try {
+                                if (!window.opener) {
+                                    console.error('Recording: window.opener is not available');
+                                    return;
+                                }
+                                
+                                if (!window.opener.addRecordedAction) {
+                                    console.error('Recording: addRecordedAction function not found in opener');
+                                    return;
+                                }
+                                
+                                const selector = generateSelector(target);
+                                const action = {
+                                    type: type,
+                                    selector: selector,
+                                    locator: selector,
+                                    value: value || '',
+                                    description: description,
+                                    timestamp: Date.now(),
+                                    sequence: ++actionSequence,
+                                    url: window.location.href
+                                };
+                                
+                                console.log('Recording action:', action);
+                                
+                                // Add visual feedback for the action
+                                highlightElement(target, type);
+                                
+                                window.opener.addRecordedAction(action);
+                            } catch (error) {
+                                console.error('Recording: Failed to capture action:', error);
+                            }
+                        }
+                        
+                        // Add visual feedback when element is interacted with
+                        function highlightElement(element, actionType) {
+                            if (!element) return;
+                            
+                            try {
+                                const originalBorder = element.style.border;
+                                const originalBoxShadow = element.style.boxShadow;
+                                
+                                element.style.border = '3px solid #28a745';
+                                element.style.boxShadow = '0 0 10px rgba(40, 167, 69, 0.5)';
+                                
+                                // Create action label
+                                const label = document.createElement('div');
+                                label.style.cssText = \`
+                                    position: absolute;
+                                    background: #28a745;
+                                    color: white;
+                                    padding: 2px 6px;
+                                    border-radius: 3px;
+                                    font-size: 11px;
+                                    font-family: Arial, sans-serif;
+                                    z-index: 10001;
+                                    pointer-events: none;
+                                \`;
+                                label.textContent = \`🤖 \${actionType.charAt(0).toUpperCase() + actionType.slice(1)}ing...\`;
+                                
+                                const rect = element.getBoundingClientRect();
+                                label.style.left = (rect.left + window.scrollX) + 'px';
+                                label.style.top = (rect.top + window.scrollY - 25) + 'px';
+                                
+                                document.body.appendChild(label);
+                                
+                                // Remove highlighting after 2 seconds
+                                setTimeout(() => {
+                                    element.style.border = originalBorder;
+                                    element.style.boxShadow = originalBoxShadow;
+                                    if (label.parentNode) {
+                                        label.parentNode.removeChild(label);
+                                    }
+                                }, 2000);
+                            } catch (error) {
+                                console.error('Recording: Failed to highlight element:', error);
+                            }
+                        }
+                        
+                        // Enhanced selector generation
+                        function generateSelector(element) {
+                            if (!element) return 'unknown';
+                            
+                            // Priority order: id, name, data attributes, text content, class, tag
+                            if (element.id) {
+                                return '#' + element.id;
+                            }
+                            
+                            if (element.name) {
+                                return \`[name="\${element.name}"]\`;
+                            }
+                            
+                            // Check for data attributes
+                            if (element.dataset.testid) {
+                                return \`[data-testid="\${element.dataset.testid}"]\`;
+                            }
+                            
+                            if (element.dataset.cy) {
+                                return \`[data-cy="\${element.dataset.cy}"]\`;
+                            }
+                            
+                            // For buttons and links, prefer text content
+                            if ((element.tagName === 'BUTTON' || element.tagName === 'A') && element.textContent && element.textContent.trim()) {
+                                const text = element.textContent.trim().substring(0, 30);
+                                return \`text=\${text}\`;
+                            }
+                            
+                            // For form inputs, try placeholder or label
+                            if (element.placeholder) {
+                                return \`[placeholder="\${element.placeholder}"]\`;
+                            }
+                            
+                            // Build CSS selector with class
+                            let selector = element.tagName.toLowerCase();
+                            if (element.className && element.className.trim()) {
+                                const classes = element.className.trim().split(/\\s+/).slice(0, 3); // Limit to 3 classes
+                                selector += '.' + classes.join('.');
+                            }
+                            
+                            return selector;
+                        }
+                        
+                        // Wait for DOM to be ready with retry mechanism
                         function initRecording() {
+                            if (setupComplete) return;
+                            
                             console.log('Recording: DOM ready, setting up event listeners');
                             
                             // Verify opener connection
@@ -1985,152 +2281,201 @@
                                 }
                             } else {
                                 console.error('Recording: window.opener not available');
+                                // Retry after a short delay
+                                setTimeout(initRecording, 500);
+                                return;
                             }
+                            
+                            setupComplete = true;
+                            setupEventListeners();
                         }
                         
+                        function setupEventListeners() {
+                            // Track clicks with improved handling
+                            document.addEventListener('click', function(e) {
+                                try {
+                                    if (window.opener && window.opener.isRecordingActive() && !window.opener.isRecordingPaused()) {
+                                        const target = e.target;
+                                        let description = 'Click ';
+                                        
+                                        if (target.textContent && target.textContent.trim()) {
+                                            description += target.textContent.trim().substring(0, 30);
+                                        } else if (target.alt) {
+                                            description += target.alt;
+                                        } else if (target.title) {
+                                            description += target.title;
+                                        } else {
+                                            description += target.tagName.toLowerCase();
+                                        }
+                                        
+                                        captureAction('click', target, '', description);
+                                    }
+                                } catch (error) {
+                                    console.error('Recording: Click tracking failed:', error);
+                                }
+                            }, true);
+                            
+                            // Track input changes with debouncing
+                            let inputTimeout = null;
+                            document.addEventListener('input', function(e) {
+                                try {
+                                    if (window.opener && window.opener.isRecordingActive() && !window.opener.isRecordingPaused()) {
+                                        clearTimeout(inputTimeout);
+                                        inputTimeout = setTimeout(() => {
+                                            const target = e.target;
+                                            if (target.type === 'password') {
+                                                captureAction('input', target, '***', 'Enter password');
+                                            } else {
+                                                const value = target.value || '';
+                                                const description = \`Enter text: \${value.substring(0, 20)}\${value.length > 20 ? '...' : ''}\`;
+                                                captureAction('input', target, value, description);
+                                            }
+                                        }, 300); // Debounce for 300ms
+                                    }
+                                } catch (error) {
+                                    console.error('Recording: Input tracking failed:', error);
+                                }
+                            }, true);
+                            
+                            // Track change events (for dropdowns, checkboxes, radio buttons)
+                            document.addEventListener('change', function(e) {
+                                try {
+                                    if (window.opener && window.opener.isRecordingActive() && !window.opener.isRecordingPaused()) {
+                                        const target = e.target;
+                                        if (target.type === 'checkbox') {
+                                            captureAction('checkbox', target, target.checked, \`\${target.checked ? 'Check' : 'Uncheck'} checkbox\`);
+                                        } else if (target.type === 'radio') {
+                                            captureAction('radio', target, target.value, \`Select radio: \${target.value}\`);
+                                        } else if (target.tagName === 'SELECT') {
+                                            const selectedText = target.options[target.selectedIndex]?.text || target.value;
+                                            captureAction('select', target, target.value, \`Select option: \${selectedText}\`);
+                                        }
+                                    }
+                                } catch (error) {
+                                    console.error('Recording: Change tracking failed:', error);
+                                }
+                            }, true);
+                            
+                            // Track form submissions
+                            document.addEventListener('submit', function(e) {
+                                try {
+                                    if (window.opener && window.opener.isRecordingActive() && !window.opener.isRecordingPaused()) {
+                                        captureAction('submit', e.target, '', 'Submit form');
+                                    }
+                                } catch (error) {
+                                    console.error('Recording: Submit tracking failed:', error);
+                                }
+                            }, true);
+                            
+                            // Track navigation with improved detection
+                            let lastUrl = window.location.href;
+                            const checkUrlChange = () => {
+                                try {
+                                    if (window.location.href !== lastUrl) {
+                                        if (window.opener && window.opener.isRecordingActive() && !window.opener.isRecordingPaused()) {
+                                            window.opener.addRecordedAction({
+                                                type: 'navigate',
+                                                selector: '',
+                                                locator: '',
+                                                value: window.location.href,
+                                                description: 'Navigate to ' + window.location.href,
+                                                timestamp: Date.now(),
+                                                sequence: ++actionSequence
+                                            });
+                                        }
+                                        lastUrl = window.location.href;
+                                    }
+                                } catch (error) {
+                                    console.error('Recording: Navigation tracking failed:', error);
+                                }
+                            };
+                            
+                            // Check for URL changes every 500ms and on popstate
+                            setInterval(checkUrlChange, 500);
+                            window.addEventListener('popstate', checkUrlChange);
+                            
+                            console.log('Recording: All event listeners set up successfully');
+                        }
+                        
+                        // Initialize with retry mechanism
                         if (document.readyState === 'loading') {
                             document.addEventListener('DOMContentLoaded', initRecording);
                         } else {
                             initRecording();
                         }
                         
-                        function captureAction(type, target, value, description) {
-                            try {
-                                if (!window.opener) {
-                                    console.error('Recording: window.opener is not available');
-                                    return;
-                                }
-                                
-                                if (!window.opener.addRecordedAction) {
-                                    console.error('Recording: addRecordedAction function not found in opener');
-                                    return;
-                                }
-                                
-                                const selector = generateSelector(target);
-                                console.log('Recording action:', { type, selector, value, description });
-                                
-                                window.opener.addRecordedAction({
-                                    type: type,
-                                    selector: selector,
-                                    locator: selector,
-                                    value: value || '',
-                                    description: description,
-                                    timestamp: Date.now(),
-                                    sequence: ++actionSequence
-                                });
-                            } catch (error) {
-                                console.error('Recording: Failed to capture action:', error);
-                            }
-                        }
-                        
-                        function generateSelector(element) {
-                            if (element.id) {
-                                return '#' + element.id;
-                            }
-                            
-                            if (element.name) {
-                                return '[name="' + element.name + '"]';
-                            }
-                            
-                            if (element.textContent && element.textContent.trim()) {
-                                const text = element.textContent.trim().substring(0, 30);
-                                return 'text=' + text;
-                            }
-                            
-                            let selector = element.tagName.toLowerCase();
-                            if (element.className) {
-                                selector += '.' + element.className.split(' ').join('.');
-                            }
-                            
-                            return selector;
-                        }
-                        
-                        // Track clicks
-                        document.addEventListener('click', function(e) {
-                            try {
-                                if (window.opener && window.opener.isRecordingActive() && !window.opener.isRecordingPaused()) {
-                                    const description = 'Click ' + (e.target.textContent ? e.target.textContent.trim().substring(0, 30) : e.target.tagName);
-                                    captureAction('click', e.target, '', description);
-                                }
-                            } catch (error) {
-                                console.error('Recording: Click tracking failed:', error);
-                            }
-                        }, true);
-                        
-                        // Track input changes
-                        document.addEventListener('input', function(e) {
-                            try {
-                                if (window.opener && window.opener.isRecordingActive() && !window.opener.isRecordingPaused()) {
-                                    if (e.target.type === 'password') {
-                                        captureAction('input', e.target, '***', 'Enter password');
-                                    } else {
-                                        captureAction('input', e.target, e.target.value, 'Enter text: ' + e.target.value.substring(0, 20));
-                                    }
-                                }
-                            } catch (error) {
-                                console.error('Recording: Input tracking failed:', error);
-                            }
-                        }, true);
-                        
-                        // Track form submissions
-                        document.addEventListener('submit', function(e) {
-                            try {
-                                if (window.opener && window.opener.isRecordingActive() && !window.opener.isRecordingPaused()) {
-                                    captureAction('submit', e.target, '', 'Submit form');
-                                }
-                            } catch (error) {
-                                console.error('Recording: Submit tracking failed:', error);
-                            }
-                        }, true);
-                        
-                        // Track navigation
-                        let lastUrl = window.location.href;
-                        setInterval(function() {
-                            try {
-                                if (window.location.href !== lastUrl) {
-                                    if (window.opener && window.opener.isRecordingActive() && !window.opener.isRecordingPaused()) {
-                                        window.opener.addRecordedAction({
-                                            type: 'navigate',
-                                            selector: '',
-                                            locator: '',
-                                            value: window.location.href,
-                                            description: 'Navigate to ' + window.location.href,
-                                            timestamp: Date.now(),
-                                            sequence: ++actionSequence
-                                        });
-                                    }
-                                    lastUrl = window.location.href;
-                                }
-                            } catch (error) {
-                                console.error('Recording: Navigation tracking failed:', error);
+                        // Fallback initialization after a delay
+                        setTimeout(() => {
+                            if (!setupComplete) {
+                                console.log('Recording: Fallback initialization');
+                                initRecording();
                             }
                         }, 1000);
                     })();
                 `;
                 
-                doc.head.appendChild(script);
+                try {
+                    doc.head.appendChild(script);
+                    console.log('Recording script injected successfully');
+                } catch (scriptError) {
+                    console.error('Failed to inject recording script:', scriptError);
+                    showStatus('Recording script injection failed. The target site may block script injection.', 'error');
+                    return;
+                }
                 
-                // Add visual indicator
-                const indicator = doc.createElement('div');
-                indicator.style.cssText = `
-                    position: fixed;
-                    top: 10px;
-                    right: 10px;
-                    background: #ff4444;
-                    color: white;
-                    padding: 10px;
-                    border-radius: 5px;
-                    z-index: 10000;
-                    font-family: Arial, sans-serif;
-                    font-size: 14px;
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-                `;
-                indicator.textContent = '🔴 Recording in Progress';
-                doc.body.appendChild(indicator);
+                // Add visual indicator with retry mechanism
+                const addIndicator = () => {
+                    try {
+                        if (!doc.body) {
+                            setTimeout(addIndicator, 100);
+                            return;
+                        }
+                        
+                        const indicator = doc.createElement('div');
+                        indicator.id = 'recording-indicator';
+                        indicator.style.cssText = `
+                            position: fixed;
+                            top: 10px;
+                            right: 10px;
+                            background: #ff4444;
+                            color: white;
+                            padding: 10px;
+                            border-radius: 5px;
+                            z-index: 10000;
+                            font-family: Arial, sans-serif;
+                            font-size: 14px;
+                            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+                            animation: pulse 2s infinite;
+                        `;
+                        indicator.innerHTML = '🔴 Recording in Progress';
+                        
+                        // Add CSS animation
+                        const style = doc.createElement('style');
+                        style.textContent = `
+                            @keyframes pulse {
+                                0% { opacity: 1; }
+                                50% { opacity: 0.5; }
+                                100% { opacity: 1; }
+                            }
+                        `;
+                        doc.head.appendChild(style);
+                        doc.body.appendChild(indicator);
+                        
+                        console.log('Recording indicator added successfully');
+                    } catch (indicatorError) {
+                        console.error('Failed to add recording indicator:', indicatorError);
+                    }
+                };
+                
+                addIndicator();
+                };
+                
+                // Start the setup process
+                waitForDocumentReady();
                 
             } catch (error) {
                 console.error('Failed to setup recording in window:', error);
-                showStatus('Failed to setup recording. The target site may not allow recording.', 'error');
+                showStatus('Failed to setup recording. The target site may not allow recording due to security restrictions.', 'error');
             }
         }
 
@@ -2139,6 +2484,7 @@
             if (isRecording && !isPaused) {
                 recordedActions.push(action);
                 updateActionsDisplay();
+                updateLiveView(action);
             }
         };
 
@@ -2149,6 +2495,46 @@
         window.isRecordingPaused = function() {
             return isPaused;
         };
+
+        function updateLiveView(action) {
+            // Update live action count
+            document.getElementById('liveActionCount').textContent = recordedActions.length;
+            
+            // Add action to live preview
+            const livePreview = document.getElementById('liveActionsPreview');
+            
+            // Remove placeholder if it exists
+            const placeholder = livePreview.querySelector('.live-action-placeholder');
+            if (placeholder) {
+                placeholder.remove();
+            }
+            
+            // Create live action item
+            const actionItem = document.createElement('div');
+            actionItem.className = 'live-action-item';
+            
+            // Format time
+            const now = new Date();
+            const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            
+            actionItem.innerHTML = `
+                <div class="live-action-type">${action.type}</div>
+                <div class="live-action-description">${action.description}</div>
+                <div class="live-action-time">${timeString}</div>
+            `;
+            
+            // Add to top of preview (most recent first)
+            livePreview.insertBefore(actionItem, livePreview.firstChild);
+            
+            // Limit to 10 most recent actions in live view
+            const items = livePreview.querySelectorAll('.live-action-item');
+            if (items.length > 10) {
+                items[items.length - 1].remove();
+            }
+            
+            // Scroll to top to show latest action
+            livePreview.scrollTop = 0;
+        }
 
         function updateActionsDisplay() {
             const actionsList = document.getElementById('actionsList');
@@ -2177,6 +2563,12 @@
         function clearRecordedActions() {
             recordedActions = [];
             updateActionsDisplay();
+            
+            // Clear live view
+            document.getElementById('liveActionCount').textContent = '0';
+            const livePreview = document.getElementById('liveActionsPreview');
+            livePreview.innerHTML = '<div class="live-action-placeholder">Perform actions on the target page to see them here...</div>';
+            
             document.getElementById('recordedActions').style.display = 'none';
             document.getElementById('recordingInstructions').style.display = 'block';
         }
