@@ -2583,66 +2583,56 @@
         // Global functions for the recording window to call
         window.addRecordedAction = function(action) {
             if (isRecording && !isPaused) {
-                // Apply deduplication and filtering logic
+                // Apply simple deduplication logic
                 if (shouldIncludeAction(action)) {
                     recordedActions.push(action);
                     updateActionsDisplay();
                     updateLiveView(action);
+                    console.log('Action included:', action.type, action.selector);
+                } else {
+                    console.log('Action filtered out:', action.type, action.selector);
                 }
             }
         };
 
-        // Filter and deduplicate actions to reduce noise
+        // Simple and effective deduplication logic
         function shouldIncludeAction(newAction) {
-            try {
-                // Check for duplicate or redundant actions within the last few actions
-                const recent = recordedActions.slice(-5); // Check last 5 actions
+            // For the first action, always include it
+            if (recordedActions.length === 0) {
+                return true;
+            }
+            
+            // Get the most recent action
+            const lastAction = recordedActions[recordedActions.length - 1];
+            
+            // If it's the same selector within 1 second, apply filtering rules
+            if (lastAction.selector === newAction.selector && 
+                newAction.timestamp - lastAction.timestamp < 1000) {
                 
-                for (let i = recent.length - 1; i >= 0; i--) {
-                    const recentAction = recent[i];
-                    
-                    // Same selector within 3 seconds
-                    if (recentAction.selector === newAction.selector && 
-                        newAction.timestamp - recentAction.timestamp < 3000) {
-                        
-                        console.log('Checking action for deduplication:', newAction.type, newAction.selector);
-                        
-                        // For SELECT elements: prefer 'select' over 'input'
-                        if (recentAction.type === 'select' && newAction.type === 'input') {
-                            console.log('Skipping redundant input event for select element');
-                            return false;
-                        }
-                        
-                        // For checkboxes: prefer 'checkbox' over 'input' with value 'on'
-                        if (recentAction.type === 'checkbox' && 
-                            newAction.type === 'input' && 
-                            (newAction.value === 'on' || newAction.value === true)) {
-                            console.log('Skipping redundant input event for checkbox');
-                            return false;
-                        }
-                        
-                        // Skip redundant click events on form inputs when we have better events
-                        if ((recentAction.type === 'input' || recentAction.type === 'checkbox' || recentAction.type === 'select') && 
-                            newAction.type === 'click' && 
-                            recentAction.selector.includes('#')) {
-                            console.log('Skipping redundant click event for form input');
-                            return false;
-                        }
-                        
-                        // Skip exact duplicates (same type, selector, and value)
-                        if (recentAction.type === newAction.type && 
-                            recentAction.value === newAction.value) {
-                            console.log('Skipping exact duplicate action');
-                            return false;
-                        }
-                    }
+                // For SELECT elements: keep SELECT, skip INPUT
+                if (lastAction.type === 'select' && newAction.type === 'input') {
+                    return false;
                 }
                 
-                return true;
-            } catch (error) {
-                console.error('Error in shouldIncludeAction:', error);
-                return true; // Default to including the action if there's an error
+                // For checkboxes: keep CHECKBOX, skip INPUT events with value 'on'
+                if (lastAction.type === 'checkbox' && newAction.type === 'input' && 
+                    (newAction.value === 'on' || newAction.value === true)) {
+                    return false;
+                }
+                
+                // Skip click events on form elements if we have a more specific action
+                if ((lastAction.type === 'input' || lastAction.type === 'checkbox' || lastAction.type === 'select') && 
+                    newAction.type === 'click') {
+                    return false;
+                }
+                
+                // Skip exact duplicates
+                if (lastAction.type === newAction.type && lastAction.value === newAction.value) {
+                    return false;
+                }
             }
+            
+            return true;
         }
 
 
