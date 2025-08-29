@@ -1509,6 +1509,10 @@
                     lastParsedTest = result.testCase;
                     document.getElementById('aiParsedResult').textContent = JSON.stringify(lastParsedTest, null, 2);
                     document.getElementById('aiResult').classList.remove('hidden');
+                    
+                    // Auto-save and execute the generated test case as per requirements
+                    showStatus('Test case generated successfully. Auto-saving and executing...', 'info');
+                    await autoSaveAndExecuteTest();
                 } else {
                     showStatus(result.error, 'error');
                 }
@@ -1538,6 +1542,45 @@
                 }
             } catch (error) {
                 showStatus('Failed to save test case: ' + error.message, 'error');
+            }
+        }
+
+        // Auto-save and execute test case (for generate from URL feature)
+        async function autoSaveAndExecuteTest() {
+            if (!lastParsedTest) return;
+
+            try {
+                // First save the test case
+                const saveResponse = await apiCall('/api/test/cases', {
+                    method: 'POST',
+                    body: JSON.stringify(lastParsedTest)
+                });
+
+                const saveResult = await saveResponse.json();
+                
+                if (saveResponse.ok) {
+                    showStatus('Test case saved successfully. Now executing...', 'success');
+                    
+                    // Get the saved test case ID and execute it
+                    const testId = saveResult.testCase?.id;
+                    if (testId) {
+                        // Clear the AI result display
+                        document.getElementById('aiResult').classList.add('hidden');
+                        document.getElementById('aiInstructions').value = '';
+                        
+                        // Reload test cases to show the new one
+                        await loadTestCases();
+                        
+                        // Auto-execute the test
+                        await executeTest(testId);
+                    } else {
+                        showStatus('Test case saved but could not auto-execute (missing ID)', 'warning');
+                    }
+                } else {
+                    showStatus('Failed to save test case: ' + (saveResult.error || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                showStatus('Failed to auto-save and execute test case: ' + error.message, 'error');
             }
         }
 
