@@ -2136,7 +2136,11 @@
                         let actionSequence = 0;
                         let setupComplete = false;
                         
-                        // Enhanced function to capture actions with better error handling
+                        // Action deduplication tracking
+                        let recentActions = new Map(); // selector -> {type, timestamp, value}
+                        const DEDUP_WINDOW = 500; // 500ms window for deduplication
+                        
+                        // Enhanced function to capture actions with deduplication and filtering
                         function captureAction(type, target, value, description) {
                             try {
                                 if (!window.opener) {
@@ -2150,13 +2154,44 @@
                                 }
                                 
                                 const selector = generateSelector(target);
+                                const now = Date.now();
+                                const actionKey = selector + ':' + type;
+                                
+                                // Check for duplicate actions within the deduplication window
+                                if (recentActions.has(actionKey)) {
+                                    const recent = recentActions.get(actionKey);
+                                    if (now - recent.timestamp < DEDUP_WINDOW) {
+                                        // Skip if same type and value within time window
+                                        if (recent.value === value) {
+                                            console.log('Skipping duplicate action:', type, selector, value);
+                                            return;
+                                        }
+                                    }
+                                }
+                                
+                                // Filter out redundant events based on element type and action type
+                                if (shouldSkipAction(type, target, value)) {
+                                    console.log('Skipping redundant action:', type, selector, value);
+                                    return;
+                                }
+                                
+                                // Update recent actions tracking
+                                recentActions.set(actionKey, {
+                                    timestamp: now,
+                                    value: value,
+                                    type: type
+                                });
+                                
+                                // Clean up old entries
+                                cleanupRecentActions(now);
+                                
                                 const action = {
                                     type: type,
                                     selector: selector,
                                     locator: selector,
                                     value: value || '',
                                     description: description,
-                                    timestamp: Date.now(),
+                                    timestamp: now,
                                     sequence: ++actionSequence,
                                     url: window.location.href
                                 };
@@ -2169,6 +2204,43 @@
                                 window.opener.addRecordedAction(action);
                             } catch (error) {
                                 console.error('Recording: Failed to capture action:', error);
+                            }
+                        }
+                        
+                        // Determine if an action should be skipped to reduce noise
+                        function shouldSkipAction(type, target, value) {
+                            const tagName = target.tagName.toLowerCase();
+                            const inputType = target.type ? target.type.toLowerCase() : '';
+                            
+                            // For SELECT elements, prefer 'change' events over 'input' events
+                            if (tagName === 'select' && type === 'input') {
+                                return true;
+                            }
+                            
+                            // For checkboxes and radio buttons, prefer 'change' events over 'input' events
+                            if ((inputType === 'checkbox' || inputType === 'radio') && type === 'input') {
+                                return true;
+                            }
+                            
+                            // Skip click events on form inputs that also have input/change events
+                            if (type === 'click' && ['input', 'textarea', 'select'].includes(tagName)) {
+                                return true;
+                            }
+                            
+                            // Skip input events with empty values (often fired during focus/blur)
+                            if (type === 'input' && (!value || value.trim() === '')) {
+                                return true;
+                            }
+                            
+                            return false;
+                        }
+                        
+                        // Clean up old entries from recent actions map
+                        function cleanupRecentActions(now) {
+                            for (const [key, action] of recentActions.entries()) {
+                                if (now - action.timestamp > DEDUP_WINDOW * 2) {
+                                    recentActions.delete(key);
+                                }
                             }
                         }
                         
@@ -2291,11 +2363,18 @@
                         }
                         
                         function setupEventListeners() {
-                            // Track clicks with improved handling
+                            // Track clicks with improved filtering
                             document.addEventListener('click', function(e) {
                                 try {
                                     if (window.opener && window.opener.isRecordingActive() && !window.opener.isRecordingPaused()) {
                                         const target = e.target;
+                                        const tagName = target.tagName.toLowerCase();
+                                        
+                                        // Skip clicks on form inputs as they'll be handled by input/change events
+                                        if (['input', 'textarea', 'select'].includes(tagName)) {
+                                            return;
+                                        }
+                                        
                                         let description = 'Click ';
                                         
                                         if (target.textContent && target.textContent.trim()) {
@@ -2315,40 +2394,62 @@
                                 }
                             }, true);
                             
-                            // Track input changes with debouncing
-                            let inputTimeout = null;
+                            // Track input changes with improved debouncing
+                            let inputTimeouts = new Map();
                             document.addEventListener('input', function(e) {
                                 try {
                                     if (window.opener && window.opener.isRecordingActive() && !window.opener.isRecordingPaused()) {
-                                        clearTimeout(inputTimeout);
-                                        inputTimeout = setTimeout(() => {
-                                            const target = e.target;
+                                        const target = e.target;
+                                        const selector = generateSelector(target);
+                                        
+                                        // Clear previous timeout for this element
+                                        if (inputTimeouts.has(selector)) {
+                                            clearTimeout(inputTimeouts.get(selector));
+                                        }
+                                        
+                                        // Set new timeout
+                                        const timeout = setTimeout(() => {
                                             if (target.type === 'password') {
                                                 captureAction('input', target, '***', 'Enter password');
                                             } else {
                                                 const value = target.value || '';
-                                                const description = \`Enter text: \${value.substring(0, 20)}\${value.length > 20 ? '...' : ''}\`;
-                                                captureAction('input', target, value, description);
+                                                if (value.trim()) { // Only capture non-empty values
+                                                    const description = \`Enter text: \${value.substring(0, 20)}\${value.length > 20 ? '...' : ''}\`;
+                                                    captureAction('input', target, value, description);
+                                                }
                                             }
-                                        }, 300); // Debounce for 300ms
+                                            inputTimeouts.delete(selector);
+                                        }, 500); // Increased debounce to 500ms
+                                        
+                                        inputTimeouts.set(selector, timeout);
                                     }
                                 } catch (error) {
                                     console.error('Recording: Input tracking failed:', error);
                                 }
                             }, true);
                             
-                            // Track change events (for dropdowns, checkboxes, radio buttons)
+                            // Track change events (preferred for dropdowns, checkboxes, radio buttons)
                             document.addEventListener('change', function(e) {
                                 try {
                                     if (window.opener && window.opener.isRecordingActive() && !window.opener.isRecordingPaused()) {
                                         const target = e.target;
-                                        if (target.type === 'checkbox') {
+                                        const tagName = target.tagName.toLowerCase();
+                                        const inputType = target.type ? target.type.toLowerCase() : '';
+                                        
+                                        if (inputType === 'checkbox') {
                                             captureAction('checkbox', target, target.checked, \`\${target.checked ? 'Check' : 'Uncheck'} checkbox\`);
-                                        } else if (target.type === 'radio') {
+                                        } else if (inputType === 'radio') {
                                             captureAction('radio', target, target.value, \`Select radio: \${target.value}\`);
-                                        } else if (target.tagName === 'SELECT') {
+                                        } else if (tagName === 'select') {
                                             const selectedText = target.options[target.selectedIndex]?.text || target.value;
                                             captureAction('select', target, target.value, \`Select option: \${selectedText}\`);
+                                        } else if (['input', 'textarea'].includes(tagName) && !['checkbox', 'radio'].includes(inputType)) {
+                                            // Handle other input types that might not fire input events
+                                            const value = target.value || '';
+                                            if (value.trim()) {
+                                                const description = \`Enter text: \${value.substring(0, 20)}\${value.length > 20 ? '...' : ''}\`;
+                                                captureAction('input', target, value, description);
+                                            }
                                         }
                                     }
                                 } catch (error) {
@@ -2482,11 +2583,68 @@
         // Global functions for the recording window to call
         window.addRecordedAction = function(action) {
             if (isRecording && !isPaused) {
-                recordedActions.push(action);
-                updateActionsDisplay();
-                updateLiveView(action);
+                // Apply deduplication and filtering logic
+                if (shouldIncludeAction(action)) {
+                    recordedActions.push(action);
+                    updateActionsDisplay();
+                    updateLiveView(action);
+                }
             }
         };
+
+        // Filter and deduplicate actions to reduce noise
+        function shouldIncludeAction(newAction) {
+            try {
+                // Check for duplicate or redundant actions within the last few actions
+                const recent = recordedActions.slice(-5); // Check last 5 actions
+                
+                for (let i = recent.length - 1; i >= 0; i--) {
+                    const recentAction = recent[i];
+                    
+                    // Same selector within 3 seconds
+                    if (recentAction.selector === newAction.selector && 
+                        newAction.timestamp - recentAction.timestamp < 3000) {
+                        
+                        console.log('Checking action for deduplication:', newAction.type, newAction.selector);
+                        
+                        // For SELECT elements: prefer 'select' over 'input'
+                        if (recentAction.type === 'select' && newAction.type === 'input') {
+                            console.log('Skipping redundant input event for select element');
+                            return false;
+                        }
+                        
+                        // For checkboxes: prefer 'checkbox' over 'input' with value 'on'
+                        if (recentAction.type === 'checkbox' && 
+                            newAction.type === 'input' && 
+                            (newAction.value === 'on' || newAction.value === true)) {
+                            console.log('Skipping redundant input event for checkbox');
+                            return false;
+                        }
+                        
+                        // Skip redundant click events on form inputs when we have better events
+                        if ((recentAction.type === 'input' || recentAction.type === 'checkbox' || recentAction.type === 'select') && 
+                            newAction.type === 'click' && 
+                            recentAction.selector.includes('#')) {
+                            console.log('Skipping redundant click event for form input');
+                            return false;
+                        }
+                        
+                        // Skip exact duplicates (same type, selector, and value)
+                        if (recentAction.type === newAction.type && 
+                            recentAction.value === newAction.value) {
+                            console.log('Skipping exact duplicate action');
+                            return false;
+                        }
+                    }
+                }
+                
+                return true;
+            } catch (error) {
+                console.error('Error in shouldIncludeAction:', error);
+                return true; // Default to including the action if there's an error
+            }
+        }
+
 
         window.isRecordingActive = function() {
             return isRecording;
