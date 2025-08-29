@@ -866,11 +866,13 @@
                             </div>
                             <button onclick="parseWithAI()">Parse with AI</button>
                             <button onclick="generateFromURL()" class="btn-secondary">Generate from URL</button>
+                            <button onclick="browseAndGenerate()" class="btn-primary">🔍 Browse & Generate</button>
                             
                             <div id="aiResult" class="hidden">
                                 <h4>Parsed Test Case:</h4>
                                 <pre id="aiParsedResult"></pre>
-                                <button onclick="saveAIParsedTest()" class="btn-success">Save Test Case</button>
+                                <button onclick="saveAIParsedTest()">Save Test Case</button>
+                                <button onclick="saveAndExecuteAIParsedTest()" class="btn-primary">Save & Execute</button>
                             </div>
                         </div>
 
@@ -2806,6 +2808,97 @@
             
             document.getElementById('recordedActions').style.display = 'none';
             document.getElementById('recordingInstructions').style.display = 'block';
+        }
+
+        // Browse and Generate functionality
+        async function browseAndGenerate() {
+            const url = prompt('Enter URL to browse and generate test from:');
+            if (!url) return;
+
+            // Validate URL
+            try {
+                new URL(url);
+            } catch {
+                showStatus('Please enter a valid URL', 'error');
+                return;
+            }
+
+            const autoExecute = confirm('Do you want to automatically execute the generated test case?\n\nClick OK to auto-execute, or Cancel to just generate the test.');
+
+            try {
+                showStatus('📸 Taking screenshot and analyzing page...', 'info');
+                
+                const response = await apiCall('/api/test/ai/browse-and-generate', {
+                    method: 'POST',
+                    body: JSON.stringify({ url, autoExecute })
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    lastParsedTest = result.testCase;
+                    document.getElementById('aiParsedResult').textContent = JSON.stringify(lastParsedTest, null, 2);
+                    document.getElementById('aiResult').classList.remove('hidden');
+                    
+                    if (autoExecute && result.execution) {
+                        showStatus(`✅ Test case generated and executed! Status: ${result.execution.status}. Execution time: ${result.execution.executionTime}ms`, 'success');
+                        loadTestCases(); // Refresh the test cases list
+                    } else {
+                        showStatus('🔍 Test case generated successfully from screenshot analysis!', 'success');
+                    }
+                } else {
+                    showStatus(result.error, 'error');
+                }
+            } catch (error) {
+                showStatus('Browse and generate failed: ' + error.message, 'error');
+            }
+        }
+
+        // Save and execute AI parsed test (for the new Save & Execute button)
+        async function saveAndExecuteAIParsedTest() {
+            if (!lastParsedTest) return;
+
+            try {
+                showStatus('Saving and executing test case...', 'info');
+                
+                // First save the test case
+                const saveResponse = await apiCall('/api/test/cases', {
+                    method: 'POST',
+                    body: JSON.stringify(lastParsedTest)
+                });
+
+                const saveResult = await saveResponse.json();
+                
+                if (saveResponse.ok) {
+                    const testCaseId = saveResult.id;
+                    
+                    // Now execute the test case
+                    const executeResponse = await apiCall(`/api/test/execute/${testCaseId}`, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            browserType: 'chromium',
+                            headless: true,
+                            interactionDelay: 2
+                        })
+                    });
+
+                    const executeResult = await executeResponse.json();
+                    
+                    if (executeResponse.ok) {
+                        showStatus(`Test case saved and executed successfully! Status: ${executeResult.result.status}`, 'success');
+                        document.getElementById('aiResult').classList.add('hidden');
+                        document.getElementById('aiInstructions').value = '';
+                        loadTestCases();
+                    } else {
+                        showStatus('Test saved but execution failed: ' + executeResult.error, 'warning');
+                        loadTestCases();
+                    }
+                } else {
+                    showStatus('Failed to save test case: ' + saveResult.error, 'error');
+                }
+            } catch (error) {
+                showStatus('Failed to save and execute test case: ' + error.message, 'error');
+            }
         }
 
         function saveRecordedTest() {
