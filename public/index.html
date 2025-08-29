@@ -1243,9 +1243,35 @@
             updatePresetSelection();
         }
 
+        // Token validation function
+        function validateToken() {
+            if (!authToken) {
+                return false;
+            }
+            
+            try {
+                // Parse the token to check expiration
+                const payload = JSON.parse(atob(authToken.split('.')[1]));
+                const currentTime = Math.floor(Date.now() / 1000);
+                
+                if (payload.exp && payload.exp < currentTime) {
+                    console.log('Token has expired');
+                    showStatus('Your session has expired. Please log in again.', 'error');
+                    logout();
+                    return false;
+                }
+                
+                return true;
+            } catch (error) {
+                console.log('Invalid token format:', error);
+                logout();
+                return false;
+            }
+        }
+
         // Initialize app
         document.addEventListener('DOMContentLoaded', function() {
-            if (authToken) {
+            if (authToken && validateToken()) {
                 showMainContent();
                 showNavbar();
                 checkBrowserStatus();
@@ -1374,7 +1400,7 @@
             document.getElementById(`${tab}TestTab`).classList.add('active');
         }
 
-        // API call helper
+        // API call helper with token expiration handling
         async function apiCall(url, options = {}) {
             const defaultOptions = {
                 headers: {
@@ -1383,7 +1409,25 @@
                 }
             };
 
-            return fetch(url, { ...defaultOptions, ...options });
+            try {
+                const response = await fetch(url, { ...defaultOptions, ...options });
+                
+                // Handle token expiration or invalid token
+                if (response.status === 403) {
+                    const result = await response.json().catch(() => ({}));
+                    if (result.error === 'Invalid or expired token') {
+                        console.log('Token expired or invalid, logging out user');
+                        showStatus('Your session has expired. Please log in again.', 'error');
+                        logout();
+                        return response; // Return the response so calling code can handle it
+                    }
+                }
+                
+                return response;
+            } catch (error) {
+                console.error('API call failed:', error);
+                throw error;
+            }
         }
 
         // Browser status check
