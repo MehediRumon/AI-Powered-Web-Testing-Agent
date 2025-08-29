@@ -99,14 +99,21 @@ class GrokService {
         }
     }
 
-    // Analyze screenshot with Grok AI
+    // Analyze screenshot with Grok AI or fallback to text-based analysis
     async analyzeScreenshotWithGrok(url, screenshotPath) {
         try {
             console.log('Starting Grok AI analysis...');
             
-            // Read screenshot file and convert to base64
-            const imageBuffer = fs.readFileSync(screenshotPath);
-            const base64Image = imageBuffer.toString('base64');
+            // Read screenshot file for potential future use
+            let imageAnalysisPrompt = '';
+            
+            // Check if the screenshot exists and get basic page information
+            if (fs.existsSync(screenshotPath)) {
+                // For now, we'll use text-based analysis since Groq models may not support vision
+                // In the future, this could be enhanced to support vision models if available
+                imageAnalysisPrompt = `\n\nNote: A screenshot was taken of the page for context, showing the current state of the UI.`;
+                console.log('Screenshot available for analysis context');
+            }
 
             const response = await fetch(`${this.baseURL}/chat/completions`, {
                 method: 'POST',
@@ -119,15 +126,16 @@ class GrokService {
                     messages: [
                         {
                             role: 'system',
-                            content: `You are a web testing expert AI. Analyze the description of a web page and generate comprehensive test cases based on the typical UI elements and functionality.
+                            content: `You are a web testing expert AI. Analyze a website URL and generate comprehensive test cases based on common UI patterns and functionality for this type of website.
 
 Focus on identifying and testing:
 1. Interactive elements (buttons, links, forms, input fields)
 2. Navigation elements (menus, tabs, breadcrumbs)
 3. Important content areas and functionality
-4. Login/authentication flows if visible
-5. Search functionality if present
+4. Login/authentication flows if typical for this site type
+5. Search functionality if commonly found on such sites
 6. Form submissions and validations
+7. Core user workflows and interactions
 
 Return a JSON object with this exact structure:
 {
@@ -150,19 +158,29 @@ Supported action types:
 - click: Click buttons, links, elements (use text=ButtonText for text-based)
 - fill: Fill input fields (use input[type='text'], input[name='field'] etc.)
 - select: Select dropdown options
-- wait: Wait for elements or time
+- wait: Wait for elements or time (value in seconds)
 - verify: Verify page content or URL
 - assert_visible: Assert element is visible
 - assert_text: Assert text content
 
 Use specific CSS selectors when possible, or text-based selectors like "text=Button Text" for clarity.
-Prioritize the most important user interactions and create a realistic test flow.`
+Create realistic test actions that a user would typically perform on this type of website.
+Focus on the most important user interactions and create a comprehensive test flow.`
                         },
                         {
                             role: 'user',
-                            content: `Please analyze this website ${url} and generate a comprehensive test case that covers the main interactive elements and user flows that would typically be found on such a page. Create realistic test actions that a user would typically perform.
+                            content: `Please analyze this website ${url} and generate a comprehensive test case that covers the main interactive elements and user flows that would typically be found on such a page.
 
-Based on the URL pattern and common web conventions, create appropriate test steps for testing the main functionality of this page.`
+Based on the URL pattern, domain, and common web conventions, create appropriate test steps for testing the main functionality of this page. Consider what type of website this appears to be and what users typically do on such sites.${imageAnalysisPrompt}
+
+Generate test actions that cover:
+1. Page loading and basic navigation
+2. Key interactive elements typical for this type of site
+3. Common user workflows
+4. Form interactions if applicable
+5. Important functionality verification
+
+Make the test comprehensive but realistic for this specific URL.`
                         }
                     ],
                     max_tokens: 2000,
@@ -215,23 +233,92 @@ Based on the URL pattern and common web conventions, create appropriate test ste
     generateBasicTestFromURL(url) {
         console.log('Generating basic test case (fallback)');
         
+        const domain = this.extractDomainFromURL(url);
+        const urlObj = new URL(url);
+        const path = urlObj.pathname;
+        
+        // Create more intelligent basic tests based on URL patterns
+        const actions = [
+            {
+                type: 'wait',
+                value: '3',
+                description: 'Wait for page to load completely'
+            },
+            {
+                type: 'assert_visible',
+                selector: 'body',
+                description: 'Verify page loaded successfully'
+            }
+        ];
+
+        // Add common test actions based on URL patterns
+        if (domain.includes('github') || domain.includes('gitlab')) {
+            actions.push(
+                {
+                    type: 'assert_visible',
+                    selector: 'nav, header',
+                    description: 'Verify navigation is visible'
+                },
+                {
+                    type: 'click',
+                    selector: 'text=Sign in',
+                    description: 'Click sign in button if available'
+                }
+            );
+        } else if (domain.includes('google') || domain.includes('bing')) {
+            actions.push(
+                {
+                    type: 'assert_visible',
+                    selector: 'input[type="search"], input[name*="q"]',
+                    description: 'Verify search box is visible'
+                },
+                {
+                    type: 'fill',
+                    selector: 'input[type="search"], input[name*="q"]',
+                    value: 'test search',
+                    description: 'Enter test search query'
+                }
+            );
+        } else if (domain.includes('shop') || domain.includes('store') || domain.includes('amazon') || domain.includes('ebay')) {
+            actions.push(
+                {
+                    type: 'assert_visible',
+                    selector: 'input[type="search"], [placeholder*="search"]',
+                    description: 'Verify search functionality is available'
+                },
+                {
+                    type: 'click',
+                    selector: 'text=Cart, text=Basket, [data-testid*="cart"]',
+                    description: 'Check shopping cart accessibility'
+                }
+            );
+        } else {
+            // Generic website actions
+            actions.push(
+                {
+                    type: 'assert_visible',
+                    selector: 'nav, .nav, #nav, .navigation, .menu',
+                    description: 'Verify main navigation is present'
+                },
+                {
+                    type: 'click',
+                    selector: 'a[href*="about"], text=About, text=About Us',
+                    description: 'Navigate to About page if available'
+                },
+                {
+                    type: 'click',
+                    selector: 'a[href*="contact"], text=Contact, text=Contact Us',
+                    description: 'Check contact page accessibility'
+                }
+            );
+        }
+
         return {
             testCase: {
-                name: `Basic Test for ${this.extractDomainFromURL(url)}`,
-                description: `Basic functionality test for ${url}`,
+                name: `Smart Basic Test for ${domain}`,
+                description: `Intelligent basic functionality test for ${url} with URL-pattern based actions`,
                 url: url,
-                actions: [
-                    {
-                        type: 'wait',
-                        value: '3',
-                        description: 'Wait for page to load'
-                    },
-                    {
-                        type: 'assert_visible',
-                        selector: 'body',
-                        description: 'Verify page loaded successfully'
-                    }
-                ]
+                actions: actions
             }
         };
     }

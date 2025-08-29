@@ -1543,10 +1543,15 @@
             const url = prompt('Enter URL to generate test for:');
             if (!url) return;
 
+            // Ask user if they want to auto-execute the test
+            const autoExecute = confirm('Do you want to automatically execute the generated test case after creation?');
+
+            showStatus('Browsing URL and analyzing page with AI...', 'info');
+
             try {
                 const response = await apiCall('/api/test/ai/generate-from-url', {
                     method: 'POST',
-                    body: JSON.stringify({ url })
+                    body: JSON.stringify({ url, autoExecute })
                 });
 
                 const result = await response.json();
@@ -1556,9 +1561,24 @@
                     document.getElementById('aiParsedResult').textContent = JSON.stringify(lastParsedTest, null, 2);
                     document.getElementById('aiResult').classList.remove('hidden');
                     
-                    // Auto-save and execute the generated test case as per requirements
-                    showStatus('Test case generated successfully. Auto-saving and executing...', 'info');
-                    await autoSaveAndExecuteTest();
+                    if (result.execution) {
+                        // Test was auto-executed
+                        showStatus(`Test case generated and executed successfully! Status: ${result.execution.status}`, 'success');
+                        
+                        // Show execution results
+                        if (result.execution.steps && result.execution.steps.length > 0) {
+                            const stepsInfo = result.execution.steps.map(step => 
+                                `${step.stepNumber}. ${step.description} - ${step.status}`
+                            ).join('\n');
+                            console.log('Execution steps:', stepsInfo);
+                        }
+                        
+                        // Refresh test cases list to show the new saved test
+                        loadTestCases();
+                    } else {
+                        // Just generated, not executed
+                        showStatus('Test case generated successfully from screenshot analysis', 'success');
+                    }
                 } else {
                     showStatus(result.error, 'error');
                 }

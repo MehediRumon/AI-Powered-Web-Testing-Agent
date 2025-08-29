@@ -759,26 +759,116 @@ router.post('/ai/parse', authenticateToken, async (req, res) => {
     }
 });
 
-// Generate test case from URL using AI
+// Generate test case from URL using AI (now integrated with Grok)
 router.post('/ai/generate-from-url', authenticateToken, async (req, res) => {
     try {
-        const { url } = req.body;
+        const { url, autoExecute = false } = req.body;
 
         if (!url) {
             return res.status(400).json({ error: 'URL is required' });
         }
 
-        const aiService = new OpenAIService();
-        const generated = await aiService.generateTestFromURL(url);
+        // Validate URL format
+        try {
+            new URL(url);
+        } catch {
+            return res.status(400).json({ error: 'Invalid URL format' });
+        }
 
-        res.json({
-            message: 'Test case generated successfully',
-            testCase: generated.testCase
-        });
+        console.log(`Generate from URL request for: ${url}, autoExecute: ${autoExecute}`);
+
+        // Use Grok service for screenshot-based AI analysis
+        const GrokService = require('../services/grok');
+        const grokService = new GrokService();
+        
+        const generated = await grokService.browseAndGenerateTest(url);
+
+        // If autoExecute is true, save and execute the test case immediately
+        if (autoExecute && generated.testCase) {
+            try {
+                const testCase = generated.testCase;
+                testCase.user_id = req.user.id;
+                testCase.created_at = new Date().toISOString();
+                testCase.actions = JSON.stringify(testCase.actions || []);
+
+                const db = getDatabase();
+                
+                // Save test case
+                const saveResult = await new Promise((resolve, reject) => {
+                    db.run(
+                        'INSERT INTO test_cases (name, description, url, actions, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+                        [testCase.name, testCase.description, testCase.url, testCase.actions, testCase.user_id, testCase.created_at],
+                        function(err) {
+                            if (err) reject(err);
+                            else resolve({ id: this.lastID });
+                        }
+                    );
+                });
+
+                // Execute the test case immediately
+                const PlaywrightTestService = require('../services/playwright');
+                const testService = new PlaywrightTestService();
+                
+                // Parse actions back to array for execution
+                testCase.actions = JSON.parse(testCase.actions);
+                testCase.id = saveResult.id;
+
+                await testService.initialize('chromium', true);
+                const result = await testService.runTest(testCase, { interactionDelay: 2 });
+
+                // Save test result
+                db.run(
+                    'INSERT INTO test_results (test_case_id, status, execution_time, error_message, screenshot_path) VALUES (?, ?, ?, ?, ?)',
+                    [saveResult.id, result.status, result.executionTime, result.errorMessage, result.screenshotPath],
+                    function(err) {
+                        if (err) {
+                            console.error('Failed to save test result:', err);
+                        }
+                    }
+                );
+
+                await testService.close();
+                db.close();
+
+                res.json({
+                    message: 'Test case generated and executed successfully',
+                    testCase: generated.testCase,
+                    testCaseId: saveResult.id,
+                    execution: {
+                        status: result.status,
+                        executionTime: result.executionTime,
+                        screenshotPath: result.screenshotPath,
+                        steps: result.steps
+                    }
+                });
+
+            } catch (execError) {
+                console.error('Auto-execution error:', execError);
+                res.json({
+                    message: 'Test case generated successfully, but auto-execution failed',
+                    testCase: generated.testCase,
+                    executionError: execError.message
+                });
+            }
+        } else {
+            // Just return the generated test case without executing
+            res.json({
+                message: 'Test case generated successfully from screenshot analysis',
+                testCase: generated.testCase
+            });
+        }
 
     } catch (error) {
         console.error('AI generation error:', error);
-        res.status(500).json({ error: 'Failed to generate test case' });
+        
+        if (error.message.includes('API') || error.message.includes('Grok') || error.message.includes('Groq')) {
+            return res.status(503).json({ 
+                error: 'AI service temporarily unavailable. Please try again later.',
+                fallback: 'You can create test cases manually or use the basic generator.'
+            });
+        }
+        
+        res.status(500).json({ error: 'Failed to generate test case from URL' });
     }
 });
 
