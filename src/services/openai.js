@@ -1,4 +1,8 @@
 // openAIService.js
+const PlaywrightTestService = require('./playwright');
+const fs = require('fs');
+const path = require('path');
+
 class OpenAIService {
     constructor() {
         this.apiKey = process.env.OPENAI_API_KEY;
@@ -285,6 +289,229 @@ class OpenAIService {
             lowerLine.includes('type and select suggestion') ||
             (lowerLine.includes('type') && lowerLine.includes('suggestion')) ||
             (lowerLine.includes('search') && lowerLine.includes('select'));
+    }
+
+    // Generate test case from URL using AI vision analysis
+    async generateTestFromURL(url) {
+        const playwrightService = new PlaywrightTestService();
+        let screenshotPath = null;
+
+        try {
+            // Initialize browser and navigate to URL
+            await playwrightService.initialize('chromium', true);
+            await playwrightService.page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+            
+            // Wait a bit for dynamic content to load
+            await playwrightService.page.waitForTimeout(2000);
+            
+            // Take a screenshot
+            const screenshotDir = path.join(process.cwd(), 'reports', 'screenshots');
+            if (!fs.existsSync(screenshotDir)) {
+                fs.mkdirSync(screenshotDir, { recursive: true });
+            }
+            
+            screenshotPath = path.join(screenshotDir, `url-analysis-${Date.now()}.png`);
+            await playwrightService.page.screenshot({ 
+                path: screenshotPath, 
+                fullPage: true,
+                type: 'png'
+            });
+
+            // Close browser
+            await playwrightService.close();
+
+            // Analyze screenshot with AI if API key is available
+            if (this.apiKey) {
+                return await this.analyzeScreenshotWithAI(url, screenshotPath);
+            } else {
+                // Fallback: Generate basic test case without AI analysis
+                return this.generateBasicTestFromURL(url);
+            }
+
+        } catch (error) {
+            console.error('Error generating test from URL:', error);
+            
+            // Clean up browser if still open
+            try {
+                if (playwrightService.browser) {
+                    await playwrightService.close();
+                }
+            } catch (cleanupError) {
+                console.error('Cleanup error:', cleanupError);
+            }
+
+            // Clean up screenshot file if it exists
+            if (screenshotPath && fs.existsSync(screenshotPath)) {
+                try {
+                    fs.unlinkSync(screenshotPath);
+                } catch (unlinkError) {
+                    console.error('Failed to clean up screenshot:', unlinkError);
+                }
+            }
+
+            // Return fallback test case
+            return this.generateBasicTestFromURL(url);
+        }
+    }
+
+    // Analyze screenshot with GPT-4 Vision
+    async analyzeScreenshotWithAI(url, screenshotPath) {
+        try {
+            // Read screenshot file and convert to base64
+            const imageBuffer = fs.readFileSync(screenshotPath);
+            const base64Image = imageBuffer.toString('base64');
+
+            const response = await fetch(`${this.baseURL}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4o', // Using GPT-4o for vision capabilities
+                    messages: [
+                        {
+                            role: 'system',
+                            content: `You are a web testing expert. Analyze the screenshot of a web page and generate comprehensive test cases based on the visible UI elements. 
+
+Focus on:
+1. Interactive elements (buttons, links, forms, inputs)
+2. Navigation elements
+3. Important content areas
+4. Login/authentication flows if visible
+5. Search functionality if present
+
+Return a JSON object with this exact structure:
+{
+  "testCase": {
+    "name": "Descriptive test name",
+    "description": "Brief description of what this test validates",
+    "url": "${url}",
+    "actions": [
+      {
+        "type": "click|fill|select|wait|verify",
+        "selector": "CSS selector or text selector",
+        "value": "value for fill/select actions",
+        "description": "Human readable description"
+      }
+    ]
+  }
+}
+
+Supported action types:
+- navigate: Navigate to URL
+- click: Click buttons, links, elements  
+- fill: Fill input fields
+- select: Select dropdown options
+- wait: Wait for elements or time
+- verify: Verify page content or URL
+- assert_visible: Assert element is visible
+- assert_text: Assert text content
+
+Use specific selectors when possible, or text-based selectors like "text=Button Text" for clarity.`
+                        },
+                        {
+                            role: 'user',
+                            content: [
+                                {
+                                    type: 'text',
+                                    text: `Please analyze this screenshot of ${url} and generate a comprehensive test case that covers the main interactive elements and user flows visible on the page.`
+                                },
+                                {
+                                    type: 'image_url',
+                                    image_url: {
+                                        url: `data:image/png;base64,${base64Image}`,
+                                        detail: 'high'
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    max_tokens: 1500,
+                    temperature: 0.3
+                })
+            });
+
+            const data = await response.json();
+            
+            if (!response.ok) {
+                console.error('OpenAI API error:', data);
+                throw new Error(`OpenAI API error: ${data.error?.message || 'Unknown error'}`);
+            }
+
+            const content = data.choices[0]?.message?.content;
+            if (!content) {
+                throw new Error('No response content from OpenAI');
+            }
+
+            // Extract JSON from response
+            const jsonMatch = content.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                const result = JSON.parse(jsonMatch[0]);
+                if (result?.testCase?.actions) {
+                    result.testCase.actions = this.normalizeActions(result.testCase.actions);
+                }
+                
+                // Clean up screenshot file after successful analysis
+                try {
+                    fs.unlinkSync(screenshotPath);
+                } catch (unlinkError) {
+                    console.error('Failed to clean up screenshot:', unlinkError);
+                }
+                
+                return result;
+            } else {
+                throw new Error('Could not extract JSON from AI response');
+            }
+
+        } catch (error) {
+            console.error('AI screenshot analysis failed:', error);
+            
+            // Clean up screenshot file
+            if (fs.existsSync(screenshotPath)) {
+                try {
+                    fs.unlinkSync(screenshotPath);
+                } catch (unlinkError) {
+                    console.error('Failed to clean up screenshot:', unlinkError);
+                }
+            }
+            
+            // Fallback to basic test generation
+            return this.generateBasicTestFromURL(url);
+        }
+    }
+
+    // Generate a basic test case without AI analysis (fallback)
+    generateBasicTestFromURL(url) {
+        const urlObj = new URL(url);
+        const domain = urlObj.hostname;
+        const testName = `Basic Navigation Test for ${domain}`;
+        
+        return {
+            testCase: {
+                name: testName,
+                description: `Basic navigation and interaction test for ${url}`,
+                url: url,
+                actions: [
+                    {
+                        type: 'navigate',
+                        selector: '',
+                        value: url,
+                        description: `Navigate to ${url}`
+                    },
+                    {
+                        type: 'wait',
+                        value: '3000',
+                        description: 'Wait for page to load'
+                    },
+                    {
+                        type: 'assert_visible',
+                        selector: 'body',
+                        description: 'Verify page is loaded'
+                    }
+                ]
+            }
+        };
     }
 }
 
