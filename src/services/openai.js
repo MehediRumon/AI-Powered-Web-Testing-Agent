@@ -193,6 +193,10 @@ class OpenAIService {
                     description: `Select "${value}" from suggestions`,
                     timeout: 10000
                 });
+            } else if (this.isConversationalAction(lowerLine)) {  // CHECK CONVERSATIONAL ACTIONS BEFORE DROPDOWNS
+                // Handle conversational interface actions
+                const conversationalAction = this.parseConversationalInstruction(line);
+                actions.push(conversationalAction);
             } else if (this.isDropdownAction(lowerLine)) {  // THEN CHECK DROPDOWNS
                 const { selector, value } = this.parseSelectInstruction(line);
                 actions.push({ type: 'select', selector, value, description: line });
@@ -520,6 +524,114 @@ Use specific selectors when possible, or text-based selectors like "text=Button 
                     }
                 ]
             }
+        };
+    }
+
+    // Conversational interface parsing methods
+    isConversationalAction(line) {
+        const conversationalKeywords = [
+            'send message',
+            'chat',
+            'conversation',
+            'respond',
+            'verify response',
+            'select product',
+            'choose product',
+            'ask for price',
+            'দাম জানতে',
+            'ki ki product',
+            'product ase',
+            'polo black',
+            'polo white',
+            'conversation state',
+            'verify conversation',
+            'check conversation'
+        ];
+        
+        const lowerLine = line.toLowerCase();
+        return conversationalKeywords.some(keyword => lowerLine.includes(keyword));
+    }
+
+    parseConversationalInstruction(line) {
+        const lowerLine = line.toLowerCase();
+        
+        // Parse send message actions
+        if (lowerLine.includes('send message') || lowerLine.includes('send') && lowerLine.includes('message')) {
+            const messageMatch = line.match(/['"]([^'"]+)['"]/);
+            const message = messageMatch ? messageMatch[1] : 'Hello';
+            
+            return {
+                type: 'send_message',
+                selector: '#messageInput, .message-input, [placeholder*="message"], input[type="text"]',
+                value: message,
+                description: line
+            };
+        }
+        
+        // Parse verify response actions
+        if (lowerLine.includes('verify response') || lowerLine.includes('check response')) {
+            const responseMatch = line.match(/['"]([^'"]+)['"]/);
+            const expectedResponse = responseMatch ? responseMatch[1] : '';
+            
+            return {
+                type: 'verify_chat_response',
+                selector: '.business-message:last-child, .response:last-child, .chat-response:last-child',
+                value: expectedResponse,
+                description: line
+            };
+        }
+        
+        // Parse product selection actions
+        if (lowerLine.includes('select product') || lowerLine.includes('choose product')) {
+            const productMatch = line.match(/['"]([^'"]+)['"]/) || 
+                                line.match(/(polo black|polo white)/i);
+            const product = productMatch ? productMatch[1] : '';
+            
+            return {
+                type: 'select_product',
+                selector: `#${product.toLowerCase().replace(/\s+/g, '-')}, .product-option`,
+                value: product,
+                description: line
+            };
+        }
+        
+        // Parse conversation state verification
+        if (lowerLine.includes('verify conversation') || lowerLine.includes('check conversation') || 
+            lowerLine.includes('conversation state')) {
+            const stateMatch = line.match(/['"]([^'"]+)['"]/);
+            const expectedState = stateMatch ? stateMatch[1] : '';
+            
+            return {
+                type: 'verify_conversation_state',
+                selector: '#resultArea, .result-area, .conversation-state',
+                value: expectedState,
+                description: line
+            };
+        }
+        
+        // Parse Bengali/Bangla specific actions
+        if (lowerLine.includes('দাম জানতে') || lowerLine.includes('ask for price')) {
+            return {
+                type: 'click',
+                selector: '#price-inquiry, .ask-price, [data-action="ask-price"]',
+                description: line
+            };
+        }
+        
+        if (lowerLine.includes('ki ki product') || lowerLine.includes('what products')) {
+            return {
+                type: 'send_message',
+                selector: '#messageInput, .message-input',
+                value: 'ki ki product ase?',
+                description: line
+            };
+        }
+        
+        // Default conversational action
+        return {
+            type: 'click',
+            selector: 'button, .clickable',
+            description: line
         };
     }
 }

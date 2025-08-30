@@ -221,6 +221,18 @@ class PlaywrightTestService {
                     throw new Error(`Expected element to contain text '${value}' but got '${text}'`);
                 }
                 break;
+            case 'send_message':
+                await this.handleSendMessage(elementSelector, value, actionOptions);
+                break;
+            case 'verify_chat_response':
+                await this.handleVerifyChatResponse(elementSelector, value, actionOptions);
+                break;
+            case 'select_product':
+                await this.handleSelectProduct(elementSelector, value, actionOptions);
+                break;
+            case 'verify_conversation_state':
+                await this.handleVerifyConversationState(elementSelector, value, actionOptions);
+                break;
             default:
                 console.warn(`Unknown action type: ${type}`);
         }
@@ -843,6 +855,157 @@ class PlaywrightTestService {
             return JSON.stringify(options, null, 2);
         } catch (error) {
             return `Error getting options: ${error.message}`;
+        }
+    }
+
+    // Conversational interface testing methods
+    async handleSendMessage(elementSelector, message, options = {}) {
+        try {
+            await this.showInteractionIndicator(elementSelector, 'Sending message');
+            
+            // Fill the message input
+            await this.page.fill(elementSelector, message, options);
+            
+            // Look for a send button or trigger enter
+            const sendButtonSelectors = [
+                '.send-button',
+                'button[type="submit"]',
+                '[data-testid="send-button"]',
+                '.chat-send',
+                '#send-btn'
+            ];
+            
+            let sendButtonFound = false;
+            for (const sendSelector of sendButtonSelectors) {
+                try {
+                    await this.page.waitForSelector(sendSelector, { timeout: 2000 });
+                    await this.page.click(sendSelector);
+                    sendButtonFound = true;
+                    console.log(`✅ Message sent using send button: ${sendSelector}`);
+                    break;
+                } catch (e) {
+                    // Continue to next selector
+                }
+            }
+            
+            if (!sendButtonFound) {
+                // Fallback to Enter key
+                await this.page.press(elementSelector, 'Enter');
+                console.log(`✅ Message sent using Enter key`);
+            }
+            
+            // Wait for message to appear in chat
+            await this.page.waitForTimeout(1000);
+            
+        } catch (error) {
+            throw new Error(`Failed to send message: ${error.message}`);
+        }
+    }
+
+    async handleVerifyChatResponse(elementSelector, expectedContent, options = {}) {
+        try {
+            await this.showInteractionIndicator(elementSelector, 'Verifying response');
+            
+            // Wait for the response element to appear or update
+            await this.page.waitForSelector(elementSelector, { state: 'visible', timeout: options.timeout || 10000 });
+            
+            // Get the response text
+            const responseElement = await this.page.waitForSelector(elementSelector, options);
+            const responseText = await responseElement.textContent();
+            
+            // Check if the response contains the expected content
+            if (!responseText.includes(expectedContent)) {
+                throw new Error(`Expected chat response to contain '${expectedContent}' but got '${responseText}'`);
+            }
+            
+            console.log(`✅ Chat response verified: Contains '${expectedContent}'`);
+            
+        } catch (error) {
+            throw new Error(`Failed to verify chat response: ${error.message}`);
+        }
+    }
+
+    async handleSelectProduct(elementSelector, productName, options = {}) {
+        try {
+            await this.showInteractionIndicator(elementSelector, 'Selecting product');
+            
+            // Try to find product selection button or element
+            const productSelectors = [
+                `${elementSelector}`,
+                `#${productName.toLowerCase().replace(/\s+/g, '-')}`,
+                `[data-product="${productName}"]`,
+                `button:has-text("${productName}")`,
+                `.product-option:has-text("${productName}")`
+            ];
+            
+            let productSelected = false;
+            for (const selector of productSelectors) {
+                try {
+                    await this.page.waitForSelector(selector, { timeout: 2000 });
+                    await this.page.click(selector);
+                    productSelected = true;
+                    console.log(`✅ Product selected: ${productName} using selector: ${selector}`);
+                    break;
+                } catch (e) {
+                    // Continue to next selector
+                }
+            }
+            
+            if (!productSelected) {
+                throw new Error(`Could not find product selection element for: ${productName}`);
+            }
+            
+            // Wait for selection to be processed
+            await this.page.waitForTimeout(1000);
+            
+        } catch (error) {
+            throw new Error(`Failed to select product: ${error.message}`);
+        }
+    }
+
+    async handleVerifyConversationState(elementSelector, expectedState, options = {}) {
+        try {
+            await this.showInteractionIndicator(elementSelector, 'Verifying conversation state');
+            
+            // Get conversation state from the page
+            const stateInfo = await this.page.evaluate((selector) => {
+                // Check if there's a testInterface available
+                if (window.testInterface) {
+                    return {
+                        selectedProduct: window.testInterface.getSelectedProduct(),
+                        conversationState: window.testInterface.getConversationState(),
+                        messageCount: window.testInterface.getCurrentMessages().length
+                    };
+                }
+                
+                // Fallback: check DOM for state indicators
+                const element = document.querySelector(selector);
+                if (element) {
+                    return {
+                        content: element.textContent.trim(),
+                        classList: Array.from(element.classList)
+                    };
+                }
+                
+                return null;
+            }, elementSelector);
+            
+            if (!stateInfo) {
+                throw new Error(`Could not retrieve conversation state from element: ${elementSelector}`);
+            }
+            
+            // Verify the state contains expected information
+            const stateString = JSON.stringify(stateInfo).toLowerCase();
+            const expectedLower = expectedState.toLowerCase();
+            
+            if (!stateString.includes(expectedLower)) {
+                throw new Error(`Expected conversation state to contain '${expectedState}' but got: ${JSON.stringify(stateInfo)}`);
+            }
+            
+            console.log(`✅ Conversation state verified: ${expectedState}`);
+            
+        } catch (error) {
+            throw new Error(`Failed to verify conversation state: ${error.message}`);
         }
     }
 }
