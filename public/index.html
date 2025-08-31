@@ -1094,6 +1094,59 @@
                     </p>
                 </div>
                 
+                <!-- API Configuration Section -->
+                <div class="form-group" style="border-top: 1px solid #eee; padding-top: 1.5rem; margin-top: 1.5rem;">
+                    <h4 style="margin-bottom: 1rem; color: #333;">🔑 API Configuration</h4>
+                    
+                    <div class="form-group">
+                        <label for="openaiApiKey">OpenAI API Key</label>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <input 
+                                type="password" 
+                                id="openaiApiKey" 
+                                placeholder="sk-..."
+                                style="flex: 1; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                            >
+                            <button 
+                                type="button" 
+                                onclick="toggleApiKeyVisibility('openaiApiKey')" 
+                                style="padding: 0.5rem; border: 1px solid #ddd; background: #f8f9fa; border-radius: 4px; cursor: pointer;"
+                                title="Toggle visibility"
+                            >
+                                👁️
+                            </button>
+                        </div>
+                        <p style="font-size: 0.8rem; color: #666; margin-top: 0.5rem;">
+                            Required for AI-powered test generation. Get your key from <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI</a>
+                        </p>
+                        <div id="openaiKeyStatus" style="font-size: 0.8rem; margin-top: 0.5rem;"></div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="groqApiKey">Groq API Key</label>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <input 
+                                type="password" 
+                                id="groqApiKey" 
+                                placeholder="gsk_..."
+                                style="flex: 1; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                            >
+                            <button 
+                                type="button" 
+                                onclick="toggleApiKeyVisibility('groqApiKey')" 
+                                style="padding: 0.5rem; border: 1px solid #ddd; background: #f8f9fa; border-radius: 4px; cursor: pointer;"
+                                title="Toggle visibility"
+                            >
+                                👁️
+                            </button>
+                        </div>
+                        <p style="font-size: 0.8rem; color: #666; margin-top: 0.5rem;">
+                            Required for Browse feature. Get your key from <a href="https://console.groq.com/" target="_blank">Groq</a>
+                        </p>
+                        <div id="groqKeyStatus" style="font-size: 0.8rem; margin-top: 0.5rem;"></div>
+                    </div>
+                </div>
+                
                 <div style="display: flex; gap: 1rem; margin-top: 2rem;">
                     <button onclick="saveSettings()" class="btn-success">Save Settings</button>
                     <button onclick="resetSettings()" class="btn-secondary">Reset to Default</button>
@@ -1175,6 +1228,9 @@
             
             // Update preset selection
             updatePresetSelection();
+            
+            // Load API configuration
+            loadApiConfiguration();
         }
 
         function closeSettings() {
@@ -1230,10 +1286,8 @@
             enableVisualIndicators = document.getElementById('enableVisualIndicators').checked;
             localStorage.setItem('enableVisualIndicators', enableVisualIndicators.toString());
             
-            // Show success message
-            alert(`Settings saved! Interaction delay: ${interactionDelay}s, Visual indicators: ${enableVisualIndicators ? 'enabled' : 'disabled'}`);
-            
-            closeSettings();
+            // Save API configuration
+            saveApiConfiguration();
         }
 
         function resetSettings() {
@@ -1243,6 +1297,92 @@
             document.getElementById('enableVisualIndicators').checked = true;
             
             updatePresetSelection();
+        }
+
+        // API Configuration functions
+        async function loadApiConfiguration() {
+            try {
+                const response = await apiCall('/api/config/api-keys');
+                const config = await response.json();
+                
+                if (response.ok) {
+                    // Update status indicators
+                    updateApiKeyStatus('openaiKeyStatus', config.hasOpenAiKey, 'OpenAI');
+                    updateApiKeyStatus('groqKeyStatus', config.hasGroqKey, 'Groq');
+                    
+                    // Clear the input fields for security (don't show actual keys)
+                    document.getElementById('openaiApiKey').value = '';
+                    document.getElementById('groqApiKey').value = '';
+                } else {
+                    console.error('Failed to load API configuration:', config.error);
+                }
+            } catch (error) {
+                console.error('Error loading API configuration:', error);
+            }
+        }
+
+        function updateApiKeyStatus(elementId, hasKey, provider) {
+            const element = document.getElementById(elementId);
+            if (hasKey) {
+                element.innerHTML = `<span style="color: #28a745;">✓ ${provider} API key configured</span>`;
+            } else {
+                element.innerHTML = `<span style="color: #dc3545;">⚠ ${provider} API key not configured</span>`;
+            }
+        }
+
+        async function saveApiConfiguration() {
+            const openaiKey = document.getElementById('openaiApiKey').value.trim();
+            const groqKey = document.getElementById('groqApiKey').value.trim();
+            
+            // Only send keys that have been changed (non-empty)
+            const payload = {};
+            if (openaiKey) payload.openai_api_key = openaiKey;
+            if (groqKey) payload.groq_api_key = groqKey;
+            
+            // If no keys to update, just save other settings
+            if (Object.keys(payload).length === 0) {
+                alert(`Settings saved! Interaction delay: ${interactionDelay}s, Visual indicators: ${enableVisualIndicators ? 'enabled' : 'disabled'}`);
+                closeSettings();
+                return;
+            }
+            
+            try {
+                const response = await apiCall('/api/config/api-keys', {
+                    method: 'PUT',
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    // Update status indicators
+                    if (openaiKey) updateApiKeyStatus('openaiKeyStatus', true, 'OpenAI');
+                    if (groqKey) updateApiKeyStatus('groqKeyStatus', true, 'Groq');
+                    
+                    // Clear the input fields
+                    document.getElementById('openaiApiKey').value = '';
+                    document.getElementById('groqApiKey').value = '';
+                    
+                    alert(`Settings saved! Interaction delay: ${interactionDelay}s, Visual indicators: ${enableVisualIndicators ? 'enabled' : 'disabled'}, API keys updated.`);
+                } else {
+                    alert('Error saving API configuration: ' + result.error);
+                    return; // Don't close settings if API save failed
+                }
+            } catch (error) {
+                alert('Error saving API configuration: ' + error.message);
+                return; // Don't close settings if API save failed
+            }
+            
+            closeSettings();
+        }
+
+        function toggleApiKeyVisibility(inputId) {
+            const input = document.getElementById(inputId);
+            if (input.type === 'password') {
+                input.type = 'text';
+            } else {
+                input.type = 'password';
+            }
         }
 
         // Token validation function

@@ -716,7 +716,7 @@ router.post('/ai/parse', authenticateToken, async (req, res) => {
         // Sanitize instructions
         const sanitizedInstructions = instructions.trim().replace(/[<>]/g, '');
 
-        const aiService = new OpenAIService();
+        const aiService = await OpenAIService.createForUser(req.user.id);
         const parsed = await aiService.parseTestInstructions(sanitizedInstructions);
 
         // Validate the parsed result

@@ -33,6 +33,7 @@ app.use('/api/auth', require('./src/routes/auth'));
 app.use('/api/upload', require('./src/routes/upload'));
 app.use('/api/test', require('./src/routes/test'));
 app.use('/api/reports', require('./src/routes/reports'));
+app.use('/api/config', require('./src/routes/config'));
 
 // Root route
 app.get('/', (req, res) => {

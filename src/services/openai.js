@@ -1,12 +1,45 @@
 // openAIService.js
 const PlaywrightTestService = require('./playwright');
+const { getDatabase } = require('../database/init');
 const fs = require('fs');
 const path = require('path');
 
 class OpenAIService {
-    constructor() {
-        this.apiKey = process.env.OPENAI_API_KEY;
+    constructor(userApiKey = null) {
+        this.apiKey = userApiKey || process.env.OPENAI_API_KEY;
         this.baseURL = 'https://api.openai.com/v1';
+    }
+
+    // Get user's API key from database
+    static async getUserApiKey(userId) {
+        return new Promise((resolve, reject) => {
+            const db = getDatabase();
+            
+            db.get(
+                'SELECT openai_api_key FROM api_configs WHERE user_id = ?',
+                [userId],
+                (err, row) => {
+                    db.close();
+                    
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve(row ? row.openai_api_key : null);
+                    }
+                }
+            );
+        });
+    }
+
+    // Create instance with user's API key
+    static async createForUser(userId) {
+        try {
+            const userApiKey = await OpenAIService.getUserApiKey(userId);
+            return new OpenAIService(userApiKey);
+        } catch (error) {
+            console.error('Failed to get user API key:', error);
+            return new OpenAIService();
+        }
     }
 
     // Normalize selector field for uniformity
