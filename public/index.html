@@ -1120,6 +1120,9 @@
                             Required for AI-powered test generation. Get your key from <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI</a>
                         </p>
                         <div id="openaiKeyStatus" style="font-size: 0.8rem; margin-top: 0.5rem;"></div>
+                        <button type="button" onclick="testApiConnection('openai')" class="btn-secondary" style="margin-top: 0.5rem; padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+                            Test Connection
+                        </button>
                     </div>
                     
                     <div class="form-group">
@@ -1141,9 +1144,12 @@
                             </button>
                         </div>
                         <p style="font-size: 0.8rem; color: #666; margin-top: 0.5rem;">
-                            Required for Browse feature. Get your key from <a href="https://console.groq.com/" target="_blank">Groq</a>
+                            Required for AI-powered Browse & Test Generation. Get your key from <a href="https://console.groq.com/" target="_blank">Groq</a>
                         </p>
                         <div id="groqKeyStatus" style="font-size: 0.8rem; margin-top: 0.5rem;"></div>
+                        <button type="button" onclick="testApiConnection('groq')" class="btn-secondary" style="margin-top: 0.5rem; padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+                            Test Connection
+                        </button>
                     </div>
                 </div>
                 
@@ -1374,6 +1380,35 @@
             }
             
             closeSettings();
+        }
+
+        // Test API connection function
+        async function testApiConnection(service) {
+            const statusElementId = service === 'groq' ? 'groqKeyStatus' : 'openaiKeyStatus';
+            const statusElement = document.getElementById(statusElementId);
+            
+            statusElement.innerHTML = '🔄 Testing connection...';
+            statusElement.style.color = '#666';
+            
+            try {
+                const response = await apiCall('/api/config/test-connection', {
+                    method: 'POST',
+                    body: JSON.stringify({ service })
+                });
+                
+                const result = await response.json();
+                
+                if (result.connected) {
+                    statusElement.innerHTML = `✅ ${result.message}`;
+                    statusElement.style.color = '#28a745';
+                } else {
+                    statusElement.innerHTML = `❌ ${result.message}`;
+                    statusElement.style.color = '#dc3545';
+                }
+            } catch (error) {
+                statusElement.innerHTML = `❌ Test failed: ${error.message}`;
+                statusElement.style.color = '#dc3545';
+            }
         }
 
         function toggleApiKeyVisibility(inputId) {
