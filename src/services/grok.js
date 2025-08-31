@@ -85,7 +85,7 @@ class GrokService {
                 console.log(`🤖 API key found, starting AI analysis...`);
                 return await this.analyzeScreenshotWithGrok(url, screenshotPath);
             } else {
-                console.log(`⚠️  No API key available, using fallback test generation`);
+                console.log(`ℹ️  Using basic test generation (no GROQ_API_KEY configured)`);
                 // Clean up screenshot file if AI analysis is not available
                 this.cleanupScreenshot(screenshotPath);
                 
