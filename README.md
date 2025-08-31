@@ -10,6 +10,7 @@
 - ✅ **PDF Export for Reports** - Generate downloadable HTML and PDF test reports
 - ✅ **Enhanced AI Parsing** - OpenAI integration for natural language test creation
 - ✅ **User Authentication** - JWT-based authentication and role management
+- ✅ **User-Specific API Configuration** - Configure OpenAI/Groq API keys per user via web UI
 - 🎯 **Manual Test Creation** - Create tests with custom actions and selectors
 - 📊 **Real-time Test Execution** - Execute single tests or batch testing
 - 📸 **Screenshot Capture** - Automatic screenshots on test completion and failures
@@ -32,13 +33,22 @@ npm run install-browsers
 
 ### 2. Configuration
 
+**Option A: Quick Start (Recommended)**
 ```bash
-# Copy environment template
+# The application creates a default .env file automatically
+# Configure API keys through the web UI after starting the app
+```
+
+**Option B: Environment File Setup**
+```bash
+# Copy environment template (optional)
 cp .env.example .env
 
 # Edit .env file with your settings
-# Optional: Add your OpenAI API key for enhanced AI features
+# Note: API keys can be configured per-user through the web interface
 ```
+
+> 💡 **User-Specific API Configuration**: Each user can configure their own OpenAI and Groq API keys through the Settings menu in the web interface. This is the recommended approach for multi-user deployments.
 
 ### 3. Start the Application
 
@@ -247,6 +257,10 @@ npm test
 npm run dev  # In one terminal
 npm test     # In another terminal after server starts
 ```
+
+## Documentation
+
+- [API Configuration Guide](docs/API_CONFIGURATION.md) - How to configure OpenAI and Groq API keys via web UI
 
 ## Contributing
 
