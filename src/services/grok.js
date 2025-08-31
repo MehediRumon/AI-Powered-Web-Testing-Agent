@@ -7,6 +7,45 @@ class GrokService {
     constructor() {
         this.apiKey = process.env.GROQ_API_KEY;
         this.baseURL = 'https://api.groq.com/openai/v1';
+        this.isConnected = false;
+        this.connectionError = null;
+    }
+
+    // Test API connectivity
+    async testConnection() {
+        if (!this.apiKey || this.apiKey === 'your-groq-api-key-here') {
+            this.isConnected = false;
+            this.connectionError = 'API key not configured';
+            return false;
+        }
+
+        try {
+            console.log(`🔍 Testing Groq API connection...`);
+            const response = await fetch(`${this.baseURL}/models`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${this.apiKey}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                this.isConnected = true;
+                this.connectionError = null;
+                console.log(`✅ Groq API connection successful`);
+                return true;
+            } else {
+                this.isConnected = false;
+                this.connectionError = `API responded with status ${response.status}`;
+                console.log(`❌ Groq API connection failed: ${this.connectionError}`);
+                return false;
+            }
+        } catch (error) {
+            this.isConnected = false;
+            this.connectionError = error.message;
+            console.log(`❌ Groq API connection error: ${error.message}`);
+            return false;
+        }
     }
 
     // Normalize selector field for uniformity
@@ -43,10 +82,11 @@ class GrokService {
         try {
             console.log(`🚀 Starting browse and generate test for URL: ${url}`);
             
-            // Initialize browser and navigate to URL (non-headless mode for user visibility)
-            console.log(`🌐 Opening browser in visible mode for URL analysis...`);
-            await playwrightService.initialize('chromium', false);
-            console.log(`✅ Browser opened successfully in non-headless mode`);
+            // Initialize browser and navigate to URL (use headless mode in production/CI environments)
+            console.log(`🌐 Opening browser for URL analysis...`);
+            const isHeadless = process.env.NODE_ENV === 'production' || !process.env.DISPLAY;
+            await playwrightService.initialize('chromium', isHeadless);
+            console.log(`✅ Browser opened successfully in ${isHeadless ? 'headless' : 'visible'} mode`);
             
             console.log(`🔗 Navigating to URL: ${url}`);
             await playwrightService.page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
@@ -80,12 +120,21 @@ class GrokService {
             await playwrightService.close();
             console.log(`✅ Browser closed successfully`);
 
-            // Analyze screenshot with Grok AI if API key is available
-            if (this.apiKey) {
-                console.log(`🤖 API key found, starting AI analysis...`);
+            // Test API connection before attempting AI analysis
+            const isConnected = await this.testConnection();
+            
+            // Analyze screenshot with Grok AI if API key is available and working
+            if (isConnected) {
+                console.log(`🤖 Groq API connected, starting AI analysis...`);
                 return await this.analyzeScreenshotWithGrok(url, screenshotPath);
             } else {
-                console.log(`⚠️  No API key available, using fallback test generation`);
+                console.log(`⚠️  Groq AI not connected: ${this.connectionError || 'Unknown error'}`);
+                console.log(`💡 To enable AI-powered test generation:`);
+                console.log(`   1. Get a Groq API key from https://console.groq.com/`);
+                console.log(`   2. Add GROQ_API_KEY=your-actual-key to your .env file`);
+                console.log(`   3. Restart the application`);
+                console.log(`🔄 Using intelligent fallback test generation instead...`);
+                
                 // Clean up screenshot file if AI analysis is not available
                 this.cleanupScreenshot(screenshotPath);
                 
@@ -120,7 +169,7 @@ class GrokService {
     // Analyze screenshot with Grok AI or fallback to text-based analysis
     async analyzeScreenshotWithGrok(url, screenshotPath) {
         try {
-            console.log(`🤖 Starting Grok AI analysis for URL: ${url}`);
+            console.log(`🤖 Starting Groq AI analysis for URL: ${url}`);
             
             // Read screenshot file for potential future use
             let imageAnalysisPrompt = '';
@@ -133,7 +182,7 @@ class GrokService {
                 console.log(`📷 Screenshot available for analysis context: ${screenshotPath}`);
             }
 
-            console.log(`📡 Sending request to Grok AI API...`);
+            console.log(`📡 Sending request to Groq AI API...`);
             const response = await fetch(`${this.baseURL}/chat/completions`, {
                 method: 'POST',
                 headers: {
@@ -211,19 +260,19 @@ Make the test comprehensive but realistic for this specific URL.`
             const data = await response.json();
             
             if (!response.ok) {
-                console.error(`❌ Grok API error - Status: ${response.status}`);
+                console.error(`❌ Groq API error - Status: ${response.status}`);
                 console.error(`❌ Error details:`, data);
-                throw new Error(`Grok API error: ${data.error?.message || 'Unknown error'}`);
+                throw new Error(`Groq API error: ${data.error?.message || 'Unknown error'}`);
             }
 
-            console.log(`✅ Received response from Grok AI`);
+            console.log(`✅ Received response from Groq AI`);
             const content = data.choices[0]?.message?.content;
             if (!content) {
-                console.error(`❌ No response content from Grok`);
-                throw new Error('No response content from Grok');
+                console.error(`❌ No response content from Groq`);
+                throw new Error('No response content from Groq');
             }
 
-            console.log(`🔍 Grok response received, parsing JSON...`);
+            console.log(`🔍 Groq response received, parsing JSON...`);
             console.log(`📝 Response preview: ${content.substring(0, 200)}...`);
 
             // Extract JSON from response
@@ -239,21 +288,21 @@ Make the test comprehensive but realistic for this specific URL.`
                 // Clean up screenshot after successful analysis
                 this.cleanupScreenshot(screenshotPath);
                 
-                console.log(`🎉 Test case generated successfully from Grok analysis`);
+                console.log(`🎉 Test case generated successfully from Groq analysis`);
                 return result;
             }
 
-            console.error(`❌ Could not extract JSON from Grok response`);
-            throw new Error('Could not extract JSON from Grok response');
+            console.error(`❌ Could not extract JSON from Groq response`);
+            throw new Error('Could not extract JSON from Groq response');
 
         } catch (error) {
-            console.warn(`⚠️  Grok analysis failed: ${error.message}`);
+            console.warn(`⚠️  Groq analysis failed: ${error.message}`);
             console.error(`🔍 Full error details:`, error);
             
             // Clean up screenshot on error
             this.cleanupScreenshot(screenshotPath);
             
-            console.log(`🔄 Falling back to basic test generation`);
+            console.log(`🔄 Falling back to intelligent basic test generation`);
             return this.generateBasicTestFromURL(url);
         }
     }
