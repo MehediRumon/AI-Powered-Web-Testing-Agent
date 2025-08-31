@@ -17,6 +17,8 @@
 
 ## Quick Start
 
+> 🚀 **New here?** See [SETUP.md](SETUP.md) for a simplified 3-step setup guide!
+
 ### 1. Installation
 
 ```bash
@@ -33,22 +35,45 @@ npm run install-browsers
 
 ### 2. Configuration
 
-**Option A: Quick Start (Recommended)**
+**Option A: Automated Setup (Recommended)**
 ```bash
-# The application creates a default .env file automatically
-# Configure API keys through the web UI after starting the app
+# Create .env file and install everything needed
+npm run setup
+
+# Or just create the .env file
+npm run setup-env
 ```
 
-**Option B: Environment File Setup**
+**Option B: Manual Setup**
 ```bash
-# Copy environment template (optional)
+# Copy environment template
 cp .env.example .env
 
-# Edit .env file with your settings
-# Note: API keys can be configured per-user through the web interface
+# Edit .env file with your API keys (see API Key Setup section below)
+nano .env
 ```
 
-> 💡 **User-Specific API Configuration**: Each user can configure their own OpenAI and Groq API keys through the Settings menu in the web interface. This is the recommended approach for multi-user deployments.
+### 🔑 API Key Setup
+
+After creating your `.env` file, you have two ways to configure API keys:
+
+**Method 1: Edit .env file directly (for single user)**
+```bash
+# Edit the .env file and replace placeholders with your actual API keys
+OPENAI_API_KEY=sk-your-actual-openai-key-here
+GROQ_API_KEY=gsk_your-actual-groq-key-here
+```
+
+**Method 2: Use Web UI (for multiple users)**
+- Start the application first (see step 3 below)
+- Log in and go to Settings
+- Configure API keys per user through the web interface
+
+**Where to get API keys:**
+- 🔗 **OpenAI API Key**: [https://platform.openai.com/api-keys](https://platform.openai.com/api-keys) (for AI-powered test generation)
+- 🔗 **Groq API Key**: [https://console.groq.com/](https://console.groq.com/) (for advanced browse & test generation)
+
+> 💡 **Note**: The application works without API keys but AI features will use fallback parsing instead of advanced AI analysis.
 
 ### 3. Start the Application
 
