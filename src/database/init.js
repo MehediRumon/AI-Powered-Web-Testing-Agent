@@ -67,6 +67,19 @@ function initDatabase() {
         )
     `);
 
+    // Create api_configs table
+    db.run(`
+        CREATE TABLE IF NOT EXISTS api_configs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER UNIQUE,
+            openai_api_key TEXT,
+            groq_api_key TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    `);
+
     db.close((err) => {
         if (err) {
             console.error('Error closing database:', err);
