@@ -41,37 +41,51 @@ class GrokService {
         let screenshotPath = null;
 
         try {
-            console.log(`Starting browse and generate test for URL: ${url}`);
+            console.log(`🚀 Starting browse and generate test for URL: ${url}`);
             
-            // Initialize browser and navigate to URL
-            await playwrightService.initialize('chromium', true);
+            // Initialize browser and navigate to URL (non-headless mode for user visibility)
+            console.log(`🌐 Opening browser in visible mode for URL analysis...`);
+            await playwrightService.initialize('chromium', false);
+            console.log(`✅ Browser opened successfully in non-headless mode`);
+            
+            console.log(`🔗 Navigating to URL: ${url}`);
             await playwrightService.page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+            console.log(`✅ Successfully navigated to ${url}`);
             
             // Wait a bit for dynamic content to load
+            console.log(`⏳ Waiting for dynamic content to load...`);
             await playwrightService.page.waitForTimeout(3000);
+            console.log(`✅ Page content loaded, ready for screenshot`);
             
             // Take a screenshot
+            console.log(`📸 Preparing to capture screenshot...`);
             const screenshotDir = path.join(process.cwd(), 'reports', 'screenshots');
             if (!fs.existsSync(screenshotDir)) {
                 fs.mkdirSync(screenshotDir, { recursive: true });
+                console.log(`📁 Created screenshot directory: ${screenshotDir}`);
             }
             
             screenshotPath = path.join(screenshotDir, `browse-analysis-${Date.now()}.png`);
+            console.log(`📸 Taking full-page screenshot: ${screenshotPath}`);
             await playwrightService.page.screenshot({ 
                 path: screenshotPath, 
                 fullPage: true,
                 type: 'png'
             });
 
-            console.log(`Screenshot captured: ${screenshotPath}`);
+            console.log(`✅ Screenshot captured successfully: ${screenshotPath}`);
 
             // Close browser
+            console.log(`🔒 Closing browser...`);
             await playwrightService.close();
+            console.log(`✅ Browser closed successfully`);
 
             // Analyze screenshot with Grok AI if API key is available
             if (this.apiKey) {
+                console.log(`🤖 API key found, starting AI analysis...`);
                 return await this.analyzeScreenshotWithGrok(url, screenshotPath);
             } else {
+                console.log(`⚠️  No API key available, using fallback test generation`);
                 // Clean up screenshot file if AI analysis is not available
                 this.cleanupScreenshot(screenshotPath);
                 
@@ -80,20 +94,24 @@ class GrokService {
             }
 
         } catch (error) {
-            console.error('Error in browse and generate test:', error);
+            console.error(`❌ Error in browse and generate test: ${error.message}`);
+            console.error(`🔍 Full error details:`, error);
             
             // Clean up browser if still open
             try {
                 if (playwrightService.browser) {
+                    console.log(`🧹 Cleaning up browser connection...`);
                     await playwrightService.close();
+                    console.log(`✅ Browser cleanup completed`);
                 }
             } catch (cleanupError) {
-                console.error('Cleanup error:', cleanupError);
+                console.error(`❌ Cleanup error: ${cleanupError.message}`);
             }
 
             // Clean up screenshot file if it exists
             this.cleanupScreenshot(screenshotPath);
 
+            console.log(`🔄 Falling back to basic test generation`);
             // Return fallback test case
             return this.generateBasicTestFromURL(url);
         }
@@ -102,7 +120,7 @@ class GrokService {
     // Analyze screenshot with Grok AI or fallback to text-based analysis
     async analyzeScreenshotWithGrok(url, screenshotPath) {
         try {
-            console.log('Starting Grok AI analysis...');
+            console.log(`🤖 Starting Grok AI analysis for URL: ${url}`);
             
             // Read screenshot file for potential future use
             let imageAnalysisPrompt = '';
@@ -112,9 +130,10 @@ class GrokService {
                 // For now, we'll use text-based analysis since Groq models may not support vision
                 // In the future, this could be enhanced to support vision models if available
                 imageAnalysisPrompt = `\n\nNote: A screenshot was taken of the page for context, showing the current state of the UI.`;
-                console.log('Screenshot available for analysis context');
+                console.log(`📷 Screenshot available for analysis context: ${screenshotPath}`);
             }
 
+            console.log(`📡 Sending request to Grok AI API...`);
             const response = await fetch(`${this.baseURL}/chat/completions`, {
                 method: 'POST',
                 headers: {
@@ -188,54 +207,66 @@ Make the test comprehensive but realistic for this specific URL.`
                 })
             });
 
+            console.log(`📬 AI request sent, waiting for response...`);
             const data = await response.json();
             
             if (!response.ok) {
-                console.error('Grok API error:', data);
+                console.error(`❌ Grok API error - Status: ${response.status}`);
+                console.error(`❌ Error details:`, data);
                 throw new Error(`Grok API error: ${data.error?.message || 'Unknown error'}`);
             }
 
+            console.log(`✅ Received response from Grok AI`);
             const content = data.choices[0]?.message?.content;
             if (!content) {
+                console.error(`❌ No response content from Grok`);
                 throw new Error('No response content from Grok');
             }
 
-            console.log('Grok response received, parsing JSON...');
+            console.log(`🔍 Grok response received, parsing JSON...`);
+            console.log(`📝 Response preview: ${content.substring(0, 200)}...`);
 
             // Extract JSON from response
             const jsonMatch = content.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
+                console.log(`✅ JSON pattern found in response, parsing...`);
                 const result = JSON.parse(jsonMatch[0]);
                 if (result?.testCase?.actions) {
                     result.testCase.actions = this.normalizeActions(result.testCase.actions);
+                    console.log(`✅ Test case generated with ${result.testCase.actions.length} actions`);
                 }
                 
                 // Clean up screenshot after successful analysis
                 this.cleanupScreenshot(screenshotPath);
                 
-                console.log('Test case generated successfully from Grok analysis');
+                console.log(`🎉 Test case generated successfully from Grok analysis`);
                 return result;
             }
 
+            console.error(`❌ Could not extract JSON from Grok response`);
             throw new Error('Could not extract JSON from Grok response');
 
         } catch (error) {
-            console.warn('Grok analysis failed, using fallback:', error.message);
+            console.warn(`⚠️  Grok analysis failed: ${error.message}`);
+            console.error(`🔍 Full error details:`, error);
             
             // Clean up screenshot on error
             this.cleanupScreenshot(screenshotPath);
             
+            console.log(`🔄 Falling back to basic test generation`);
             return this.generateBasicTestFromURL(url);
         }
     }
 
     // Generate basic test case without AI (fallback)
     generateBasicTestFromURL(url) {
-        console.log('Generating basic test case (fallback)');
+        console.log(`🔧 Generating basic test case (fallback) for: ${url}`);
         
         const domain = this.extractDomainFromURL(url);
         const urlObj = new URL(url);
         const path = urlObj.pathname;
+        
+        console.log(`🌐 Extracted domain: ${domain}, path: ${path}`);
         
         // Create more intelligent basic tests based on URL patterns
         const actions = [
@@ -253,6 +284,7 @@ Make the test comprehensive but realistic for this specific URL.`
 
         // Add common test actions based on URL patterns
         if (domain.includes('github') || domain.includes('gitlab')) {
+            console.log(`🔧 Adding Git platform specific actions`);
             actions.push(
                 {
                     type: 'assert_visible',
@@ -266,6 +298,7 @@ Make the test comprehensive but realistic for this specific URL.`
                 }
             );
         } else if (domain.includes('google') || domain.includes('bing')) {
+            console.log(`🔍 Adding search engine specific actions`);
             actions.push(
                 {
                     type: 'assert_visible',
@@ -280,6 +313,7 @@ Make the test comprehensive but realistic for this specific URL.`
                 }
             );
         } else if (domain.includes('shop') || domain.includes('store') || domain.includes('amazon') || domain.includes('ebay')) {
+            console.log(`🛒 Adding e-commerce specific actions`);
             actions.push(
                 {
                     type: 'assert_visible',
@@ -293,6 +327,7 @@ Make the test comprehensive but realistic for this specific URL.`
                 }
             );
         } else {
+            console.log(`🌐 Adding generic website actions`);
             // Generic website actions
             actions.push(
                 {
@@ -313,6 +348,7 @@ Make the test comprehensive but realistic for this specific URL.`
             );
         }
 
+        console.log(`✅ Generated basic test case with ${actions.length} actions`);
         return {
             testCase: {
                 name: `Smart Basic Test for ${domain}`,
@@ -338,10 +374,12 @@ Make the test comprehensive but realistic for this specific URL.`
         if (screenshotPath && fs.existsSync(screenshotPath)) {
             try {
                 fs.unlinkSync(screenshotPath);
-                console.log('Screenshot cleaned up successfully');
+                console.log(`🧹 Screenshot cleaned up successfully: ${screenshotPath}`);
             } catch (unlinkError) {
-                console.error('Failed to clean up screenshot:', unlinkError);
+                console.error(`❌ Failed to clean up screenshot: ${unlinkError.message}`);
             }
+        } else if (screenshotPath) {
+            console.log(`ℹ️  Screenshot file not found for cleanup: ${screenshotPath}`);
         }
     }
 }
