@@ -1098,6 +1098,22 @@
                 <div class="form-group" style="border-top: 1px solid #eee; padding-top: 1.5rem; margin-top: 1.5rem;">
                     <h4 style="margin-bottom: 1rem; color: #333;">🔑 API Configuration</h4>
                     
+                    <!-- API Provider Selection -->
+                    <div class="form-group">
+                        <label for="preferredApiProvider">Preferred AI Provider</label>
+                        <select 
+                            id="preferredApiProvider" 
+                            style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; background: white;"
+                        >
+                            <option value="openai">OpenAI (GPT Models)</option>
+                            <option value="groq">Groq (Fast Inference)</option>
+                            <option value="grok">Grok (xAI Models)</option>
+                        </select>
+                        <p style="font-size: 0.8rem; color: #666; margin-top: 0.5rem;">
+                            Choose which AI provider to use for test generation and natural language processing.
+                        </p>
+                    </div>
+                    
                     <div class="form-group">
                         <label for="openaiApiKey">OpenAI API Key</label>
                         <div style="display: flex; gap: 0.5rem; align-items: center;">
@@ -1148,6 +1164,33 @@
                         </p>
                         <div id="groqKeyStatus" style="font-size: 0.8rem; margin-top: 0.5rem;"></div>
                         <button type="button" onclick="testApiConnection('groq')" class="btn-secondary" style="margin-top: 0.5rem; padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+                            Test Connection
+                        </button>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="grokApiKey">Grok API Key (xAI)</label>
+                        <div style="display: flex; gap: 0.5rem; align-items: center;">
+                            <input 
+                                type="password" 
+                                id="grokApiKey" 
+                                placeholder="xai-..."
+                                style="flex: 1; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"
+                            >
+                            <button 
+                                type="button" 
+                                onclick="toggleApiKeyVisibility('grokApiKey')" 
+                                style="padding: 0.5rem; border: 1px solid #ddd; background: #f8f9fa; border-radius: 4px; cursor: pointer;"
+                                title="Toggle visibility"
+                            >
+                                👁️
+                            </button>
+                        </div>
+                        <p style="font-size: 0.8rem; color: #666; margin-top: 0.5rem;">
+                            Required for xAI Grok-powered test generation. Get your key from <a href="https://x.ai/" target="_blank">xAI</a>
+                        </p>
+                        <div id="grokKeyStatus" style="font-size: 0.8rem; margin-top: 0.5rem;"></div>
+                        <button type="button" onclick="testApiConnection('grok')" class="btn-secondary" style="margin-top: 0.5rem; padding: 0.25rem 0.5rem; font-size: 0.8rem;">
                             Test Connection
                         </button>
                     </div>
@@ -1315,10 +1358,17 @@
                     // Update status indicators
                     updateApiKeyStatus('openaiKeyStatus', config.hasOpenAiKey, 'OpenAI');
                     updateApiKeyStatus('groqKeyStatus', config.hasGroqKey, 'Groq');
+                    updateApiKeyStatus('grokKeyStatus', config.hasGrokKey, 'Grok');
+                    
+                    // Set preferred API provider
+                    if (config.preferred_api_provider) {
+                        document.getElementById('preferredApiProvider').value = config.preferred_api_provider;
+                    }
                     
                     // Clear the input fields for security (don't show actual keys)
                     document.getElementById('openaiApiKey').value = '';
                     document.getElementById('groqApiKey').value = '';
+                    document.getElementById('grokApiKey').value = '';
                 } else {
                     console.error('Failed to load API configuration:', config.error);
                 }
@@ -1339,18 +1389,16 @@
         async function saveApiConfiguration() {
             const openaiKey = document.getElementById('openaiApiKey').value.trim();
             const groqKey = document.getElementById('groqApiKey').value.trim();
+            const grokKey = document.getElementById('grokApiKey').value.trim();
+            const preferredProvider = document.getElementById('preferredApiProvider').value;
             
-            // Only send keys that have been changed (non-empty)
-            const payload = {};
+            // Build payload with keys that have been changed (non-empty) and preferred provider
+            const payload = {
+                preferred_api_provider: preferredProvider
+            };
             if (openaiKey) payload.openai_api_key = openaiKey;
             if (groqKey) payload.groq_api_key = groqKey;
-            
-            // If no keys to update, just save other settings
-            if (Object.keys(payload).length === 0) {
-                alert(`Settings saved! Interaction delay: ${interactionDelay}s, Visual indicators: ${enableVisualIndicators ? 'enabled' : 'disabled'}`);
-                closeSettings();
-                return;
-            }
+            if (grokKey) payload.grok_api_key = grokKey;
             
             try {
                 const response = await apiCall('/api/config/api-keys', {
@@ -1364,12 +1412,14 @@
                     // Update status indicators
                     if (openaiKey) updateApiKeyStatus('openaiKeyStatus', true, 'OpenAI');
                     if (groqKey) updateApiKeyStatus('groqKeyStatus', true, 'Groq');
+                    if (grokKey) updateApiKeyStatus('grokKeyStatus', true, 'Grok');
                     
                     // Clear the input fields
                     document.getElementById('openaiApiKey').value = '';
                     document.getElementById('groqApiKey').value = '';
+                    document.getElementById('grokApiKey').value = '';
                     
-                    alert(`Settings saved! Interaction delay: ${interactionDelay}s, Visual indicators: ${enableVisualIndicators ? 'enabled' : 'disabled'}, API keys updated.`);
+                    alert(`Settings saved! Interaction delay: ${interactionDelay}s, Visual indicators: ${enableVisualIndicators ? 'enabled' : 'disabled'}, API provider: ${preferredProvider}, API keys updated.`);
                 } else {
                     alert('Error saving API configuration: ' + result.error);
                     return; // Don't close settings if API save failed
@@ -1384,7 +1434,8 @@
 
         // Test API connection function
         async function testApiConnection(service) {
-            const statusElementId = service === 'groq' ? 'groqKeyStatus' : 'openaiKeyStatus';
+            const statusElementId = service === 'groq' ? 'groqKeyStatus' : 
+                                   service === 'grok' ? 'grokKeyStatus' : 'openaiKeyStatus';
             const statusElement = document.getElementById(statusElementId);
             
             statusElement.innerHTML = '🔄 Testing connection...';
