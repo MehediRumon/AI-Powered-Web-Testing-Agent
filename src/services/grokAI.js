@@ -3,6 +3,9 @@ const PlaywrightTestService = require('./playwright');
 const fs = require('fs');
 const path = require('path');
 
+// Ensure fetch is available (Node.js 18+ has global fetch, fallback for older versions)
+const fetch = globalThis.fetch || require('node-fetch');
+
 class GrokAIService {
     constructor() {
         this.apiKey = process.env.GROK_API_KEY || process.env.XAI_API_KEY;
@@ -106,14 +109,23 @@ class GrokAIService {
             
             screenshotPath = path.join(screenshotDir, `grok-analysis-${Date.now()}.png`);
             console.log(`📸 Taking full-page screenshot for Grok AI: ${screenshotPath}`);
+            
+            // Take high-quality screenshot with optimized settings
             await playwrightService.page.screenshot({ 
                 path: screenshotPath, 
                 fullPage: true,
                 type: 'png',
-                quality: 90
+                quality: 90,
+                timeout: 30000  // 30 second timeout for large pages
             });
 
-            console.log(`✅ Screenshot captured successfully: ${screenshotPath}`);
+            // Verify screenshot was created successfully
+            if (!fs.existsSync(screenshotPath)) {
+                throw new Error('Screenshot file was not created successfully');
+            }
+            
+            const screenshotStats = fs.statSync(screenshotPath);
+            console.log(`✅ Screenshot captured successfully: ${screenshotPath} (${(screenshotStats.size / 1024).toFixed(2)} KB)`);
 
             // Close browser
             console.log(`🔒 Closing browser...`);
@@ -173,8 +185,16 @@ class GrokAIService {
             
             // Read screenshot file and convert to base64
             const imageBuffer = fs.readFileSync(screenshotPath);
+            const fileSizeMB = (imageBuffer.length / (1024 * 1024)).toFixed(2);
+            console.log(`📷 Screenshot loaded: ${screenshotPath} (${fileSizeMB} MB)`);
+            
+            // Validate file size (Grok AI has limits on image size)
+            if (imageBuffer.length > 20 * 1024 * 1024) { // 20MB limit
+                console.warn(`⚠️  Screenshot is large (${fileSizeMB} MB). This may affect processing time or cause API limits.`);
+            }
+            
             const base64Image = imageBuffer.toString('base64');
-            console.log(`📷 Screenshot loaded for Grok AI analysis: ${screenshotPath}`);
+            console.log(`📷 Screenshot converted to base64 successfully (${base64Image.length} characters)`);
 
             console.log(`📡 Sending screenshot to Grok AI vision model...`);
             const response = await fetch(`${this.baseURL}/chat/completions`, {
@@ -255,12 +275,24 @@ Make sure every action has a clear, descriptive explanation.`
             });
 
             console.log(`📬 Grok AI vision request sent, waiting for response...`);
+            
             const data = await response.json();
             
             if (!response.ok) {
                 console.error(`❌ Grok AI API error - Status: ${response.status}`);
                 console.error(`❌ Error details:`, data);
-                throw new Error(`Grok AI API error: ${data.error?.message || 'Unknown error'}`);
+                
+                // Provide specific error messages based on status codes
+                let errorMessage = `Grok AI API error: ${data.error?.message || 'Unknown error'}`;
+                if (response.status === 401) {
+                    errorMessage = 'Grok AI authentication failed. Please check your API key.';
+                } else if (response.status === 429) {
+                    errorMessage = 'Grok AI rate limit exceeded. Please try again later.';
+                } else if (response.status === 413) {
+                    errorMessage = 'Screenshot too large for Grok AI processing. Try a smaller page or different settings.';
+                }
+                
+                throw new Error(errorMessage);
             }
 
             console.log(`✅ Received response from Grok AI vision model`);
@@ -273,25 +305,52 @@ Make sure every action has a clear, descriptive explanation.`
             console.log(`🔍 Grok AI response received, parsing JSON...`);
             console.log(`📝 Response preview: ${content.substring(0, 200)}...`);
 
-            // Extract and parse JSON from response
-            const jsonMatch = content.match(/\{[\s\S]*\}/);
+            // Extract and parse JSON from response with enhanced error handling
+            let jsonMatch = content.match(/\{[\s\S]*\}/);
+            
+            // Try alternative JSON extraction patterns if first fails
+            if (!jsonMatch) {
+                // Try extracting JSON between ```json blocks
+                jsonMatch = content.match(/```json\s*(\{[\s\S]*?\})\s*```/);
+                if (jsonMatch) jsonMatch = [jsonMatch[1]];
+                
+                // Try extracting JSON after "testCase:" keyword
+                if (!jsonMatch) {
+                    const testCaseMatch = content.match(/testCase['":\s]*(\{[\s\S]*\})/i);
+                    if (testCaseMatch) jsonMatch = [testCaseMatch[1]];
+                }
+            }
+            
             if (jsonMatch) {
                 console.log(`✅ JSON pattern found in Grok AI response, parsing...`);
-                const result = JSON.parse(jsonMatch[0]);
-                
-                if (result?.testCase?.actions) {
-                    result.testCase.actions = this.normalizeActions(result.testCase.actions);
-                    console.log(`✅ Test case generated with ${result.testCase.actions.length} actions from Grok AI vision analysis`);
+                try {
+                    const result = JSON.parse(jsonMatch[0]);
                     
-                    // Auto-parse validation
-                    this.validateTestCase(result.testCase);
+                    // Ensure proper structure
+                    if (!result.testCase && result.name && result.actions) {
+                        // If response is a flat structure, wrap it in testCase
+                        const wrappedResult = { testCase: result };
+                        result = wrappedResult;
+                    }
+                    
+                    if (result?.testCase?.actions) {
+                        result.testCase.actions = this.normalizeActions(result.testCase.actions);
+                        console.log(`✅ Test case generated with ${result.testCase.actions.length} actions from Grok AI vision analysis`);
+                        
+                        // Auto-parse validation
+                        this.validateTestCase(result.testCase);
+                    }
+                    
+                    // Clean up screenshot after successful analysis
+                    this.cleanupScreenshot(screenshotPath);
+                    
+                    console.log(`🎉 Test case generated successfully from Grok AI vision analysis`);
+                    return result;
+                } catch (parseError) {
+                    console.error(`❌ JSON parsing failed: ${parseError.message}`);
+                    console.error(`📝 Raw JSON content: ${jsonMatch[0].substring(0, 500)}...`);
+                    throw new Error(`Failed to parse Grok AI response JSON: ${parseError.message}`);
                 }
-                
-                // Clean up screenshot after successful analysis
-                this.cleanupScreenshot(screenshotPath);
-                
-                console.log(`🎉 Test case generated successfully from Grok AI vision analysis`);
-                return result;
             }
 
             console.error(`❌ Could not extract JSON from Grok AI response`);
