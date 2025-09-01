@@ -865,7 +865,7 @@
                                 <textarea id="aiInstructions" rows="4" placeholder="Example: Go to https://example.com, click the login button, enter username 'test@example.com', enter password 'password123', and click submit"></textarea>
                             </div>
                             <button onclick="parseWithAI()">Parse with AI</button>
-                            <button onclick="generateFromURL()" class="btn-secondary">Generate from URL</button>
+                            <button onclick="generateFromURL()" class="btn-secondary">📸 Generate from URL (Grok AI)</button>
                             <button onclick="browseAndGenerate()" class="btn-primary">🔍 Browse & Generate</button>
                             
                             <div id="aiResult" class="hidden">
@@ -1721,7 +1721,7 @@
             // Ask user if they want to auto-execute the test
             const autoExecute = confirm('Do you want to automatically execute the generated test case after creation?');
 
-            showStatus('Browsing URL and analyzing page with AI...', 'info');
+            showStatus('Opening browser and capturing page screenshot for Grok AI analysis...', 'info');
 
             try {
                 const response = await apiCall('/api/test/ai/generate-from-url', {
@@ -1752,7 +1752,7 @@
                         loadTestCases();
                     } else {
                         // Just generated, not executed
-                        showStatus('Test case generated successfully from screenshot analysis', 'success');
+                        showStatus('Test case generated successfully from Grok AI vision analysis', 'success');
                     }
                 } else {
                     showStatus(result.error, 'error');
