@@ -74,11 +74,32 @@ function initDatabase() {
             user_id INTEGER UNIQUE,
             openai_api_key TEXT,
             groq_api_key TEXT,
+            grok_api_key TEXT,
+            preferred_api_provider TEXT DEFAULT 'openai',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id)
         )
     `);
+
+    // Add migration for existing api_configs table
+    db.run(`
+        ALTER TABLE api_configs ADD COLUMN grok_api_key TEXT
+    `, (err) => {
+        // Ignore error if column already exists
+        if (err && !err.message.includes('duplicate column name')) {
+            console.error('Migration error for grok_api_key:', err);
+        }
+    });
+
+    db.run(`
+        ALTER TABLE api_configs ADD COLUMN preferred_api_provider TEXT DEFAULT 'openai'
+    `, (err) => {
+        // Ignore error if column already exists
+        if (err && !err.message.includes('duplicate column name')) {
+            console.error('Migration error for preferred_api_provider:', err);
+        }
+    });
 
     db.close((err) => {
         if (err) {
