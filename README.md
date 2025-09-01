@@ -14,6 +14,8 @@
 - 🎯 **Manual Test Creation** - Create tests with custom actions and selectors
 - 📊 **Real-time Test Execution** - Execute single tests or batch testing
 - 📸 **Screenshot Capture** - Automatic screenshots on test completion and failures
+- 🤖 **Grok AI Vision Analysis** - Generate test cases from website screenshots using Grok AI
+- 🔄 **Smart Fallback System** - Graceful fallback between AI services
 
 ## Quick Start
 
@@ -71,6 +73,7 @@ GROQ_API_KEY=gsk_your-actual-groq-key-here
 
 **Where to get API keys:**
 - 🔗 **OpenAI API Key**: [https://platform.openai.com/api-keys](https://platform.openai.com/api-keys) (for AI-powered test generation)
+- 🤖 **Grok AI API Key**: [https://console.x.ai/](https://console.x.ai/) (for vision-based test generation from screenshots)
 - 🔗 **Groq API Key**: [https://console.groq.com/](https://console.groq.com/) (for advanced browse & test generation)
 
 > 💡 **Note**: The application works without API keys but AI features will use fallback parsing instead of advanced AI analysis.
@@ -155,7 +158,7 @@ npx playwright install chromium firefox webkit
 
 ### AI Features
 - `POST /api/test/ai/parse` - Parse natural language instructions
-- `POST /api/test/ai/generate-from-url` - Generate test from URL
+- `POST /api/test/ai/generate-from-url` - Generate test from URL using Grok AI vision analysis
 
 ### File Upload
 - `POST /api/upload/test-cases` - Upload CSV/Excel test cases
@@ -305,4 +308,9 @@ For issues, questions, or contributions, please open an issue on GitHub or conta
 
 ---
 
-**Note**: This application includes AI-powered features that require an OpenAI API key for full functionality. Basic testing features work without AI integration.
+**Note**: This application includes AI-powered features that support multiple AI services:
+- **Grok AI (xAI)**: For vision-based test generation from website screenshots
+- **OpenAI**: For natural language test instruction parsing  
+- **Groq**: Alternative AI service with fallback support
+
+Basic testing features work without AI integration, with intelligent fallback test generation.
