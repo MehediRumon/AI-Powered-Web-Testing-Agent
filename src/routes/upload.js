@@ -38,6 +38,25 @@ const upload = multer({
     }
 });
 
+// Configure multer for image uploads
+const imageUpload = multer({
+    storage: storage,
+    fileFilter: (req, file, cb) => {
+        // Accept image files
+        const allowedTypes = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp'];
+        const fileExt = path.extname(file.originalname).toLowerCase();
+        
+        if (allowedTypes.includes(fileExt)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only image files (PNG, JPG, JPEG, GIF, BMP, WebP) are allowed'), false);
+        }
+    },
+    limits: {
+        fileSize: 10 * 1024 * 1024 // 10MB limit
+    }
+});
+
 // Upload test cases file
 router.post('/test-cases', authenticateToken, upload.single('file'), async (req, res) => {
     try {
@@ -220,5 +239,94 @@ function parseJsonFile(filePath) {
         }
     });
 }
+
+// Upload image for AI analysis and test case generation
+router.post('/image-analysis', authenticateToken, imageUpload.single('image'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No image file uploaded' });
+        }
+
+        const db = getDatabase();
+        const filePath = req.file.path;
+        const fileExt = path.extname(req.file.originalname).toLowerCase();
+
+        // Record file upload in database
+        db.run(
+            'INSERT INTO uploaded_files (filename, original_name, file_path, file_type, user_id) VALUES (?, ?, ?, ?, ?)',
+            [req.file.filename, req.file.originalname, filePath, fileExt, req.user.id],
+            function(err) {
+                if (err) {
+                    console.error('Database error:', err);
+                    return res.status(500).json({ error: 'Failed to record file upload' });
+                }
+            }
+        );
+
+        // Analyze image with AI
+        const OpenAIService = require('../services/openai');
+        const openaiService = await OpenAIService.createForUser(req.user.id);
+        
+        if (!openaiService.apiKey) {
+            // Clean up file if no API key
+            try {
+                fs.unlinkSync(filePath);
+            } catch (unlinkError) {
+                console.error('Failed to clean up file:', unlinkError);
+            }
+            
+            db.close();
+            return res.status(400).json({ 
+                error: 'OpenAI API key not configured. Please add your API key in the settings.',
+                requiresApiKey: true
+            });
+        }
+
+        try {
+            // Use the existing image analysis functionality
+            const result = await openaiService.analyzeUploadedImage(filePath, req.file.originalname);
+            
+            db.close();
+            
+            // Clean up the uploaded file after analysis
+            try {
+                fs.unlinkSync(filePath);
+            } catch (unlinkError) {
+                console.error('Failed to clean up analyzed file:', unlinkError);
+            }
+
+            res.json({
+                message: 'Image analyzed successfully',
+                file: {
+                    filename: req.file.filename,
+                    originalName: req.file.originalname,
+                    size: req.file.size
+                },
+                analysis: result
+            });
+
+        } catch (analysisError) {
+            console.error('Image analysis error:', analysisError);
+            
+            // Clean up file on error
+            try {
+                fs.unlinkSync(filePath);
+            } catch (unlinkError) {
+                console.error('Failed to clean up file:', unlinkError);
+            }
+            
+            db.close();
+            
+            res.status(500).json({ 
+                error: 'Failed to analyze image: ' + analysisError.message,
+                fallback: 'You can create test cases manually or use the URL generation feature.'
+            });
+        }
+
+    } catch (error) {
+        console.error('Image upload error:', error);
+        res.status(500).json({ error: 'Failed to process uploaded image' });
+    }
+});
 
 module.exports = router;

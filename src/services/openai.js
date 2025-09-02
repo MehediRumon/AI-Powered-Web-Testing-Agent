@@ -523,7 +523,173 @@ Use specific selectors when possible, or text-based selectors like "text=Button 
         }
     }
 
-    // Generate a basic test case without AI analysis (fallback)
+    // Analyze uploaded image with GPT-4 Vision
+    async analyzeUploadedImage(imagePath, originalName) {
+        try {
+            // Read image file and convert to base64
+            const imageBuffer = fs.readFileSync(imagePath);
+            const base64Image = imageBuffer.toString('base64');
+            
+            // Determine image type from file extension
+            const fileExt = path.extname(originalName).toLowerCase();
+            let mimeType = 'image/png'; // default
+            switch (fileExt) {
+                case '.jpg':
+                case '.jpeg':
+                    mimeType = 'image/jpeg';
+                    break;
+                case '.png':
+                    mimeType = 'image/png';
+                    break;
+                case '.gif':
+                    mimeType = 'image/gif';
+                    break;
+                case '.bmp':
+                    mimeType = 'image/bmp';
+                    break;
+                case '.webp':
+                    mimeType = 'image/webp';
+                    break;
+            }
+
+            const response = await fetch(`${this.baseURL}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${this.apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'gpt-4o', // Using GPT-4o for vision capabilities
+                    messages: [
+                        {
+                            role: 'system',
+                            content: `You are a web testing expert. Analyze the uploaded screenshot/image of a web interface and generate comprehensive test cases based on the visible UI elements.
+
+Focus on:
+1. Interactive elements (buttons, links, forms, inputs, dropdowns)
+2. Navigation elements (menus, breadcrumbs, tabs)
+3. Important content areas (headers, sections, cards)
+4. Login/authentication flows if visible
+5. Search functionality if present
+6. Form elements and their validation
+7. Modal dialogs or popups if visible
+
+Return a JSON object with this exact structure:
+{
+  "testCase": {
+    "name": "Descriptive test name based on the interface",
+    "description": "Brief description of what this test validates",
+    "url": "https://example.com",
+    "actions": [
+      {
+        "type": "click|fill|select|wait|verify|assert_visible|assert_text",
+        "selector": "CSS selector or text selector",
+        "value": "value for fill/select actions",
+        "description": "Human readable description"
+      }
+    ]
+  }
+}
+
+Supported action types:
+- navigate: Navigate to URL
+- click: Click buttons, links, elements  
+- fill: Fill input fields
+- select: Select dropdown options
+- wait: Wait for elements or time
+- verify: Verify page content or URL
+- assert_visible: Assert element is visible
+- assert_text: Assert text content
+- hover: Hover over elements
+- scroll: Scroll the page
+
+Use specific selectors when possible (CSS selectors like #id, .class, input[type="text"]), or text-based selectors like "text=Button Text" for clarity.
+Generate realistic test scenarios that would validate the key functionality visible in the interface.`
+                        },
+                        {
+                            role: 'user',
+                            content: [
+                                {
+                                    type: 'text',
+                                    text: `Please analyze this screenshot/image and generate a comprehensive test case that covers the main interactive elements and user flows visible in the interface. Focus on realistic testing scenarios that would validate the functionality shown.`
+                                },
+                                {
+                                    type: 'image_url',
+                                    image_url: {
+                                        url: `data:${mimeType};base64,${base64Image}`,
+                                        detail: 'high'
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    max_tokens: 1500,
+                    temperature: 0.3
+                })
+            });
+
+            const data = await response.json();
+            
+            if (!response.ok) {
+                console.error('OpenAI API error:', data);
+                throw new Error(`OpenAI API error: ${data.error?.message || 'Unknown error'}`);
+            }
+
+            const content = data.choices[0]?.message?.content;
+            if (!content) {
+                throw new Error('No response content from OpenAI');
+            }
+
+            // Extract JSON from response
+            const jsonMatch = content.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                const result = JSON.parse(jsonMatch[0]);
+                if (result?.testCase?.actions) {
+                    result.testCase.actions = this.normalizeActions(result.testCase.actions);
+                }
+                return result;
+            } else {
+                throw new Error('Could not extract JSON from AI response');
+            }
+
+        } catch (error) {
+            console.error('AI image analysis failed:', error);
+            
+            // Fallback: Generate basic test case for uploaded image
+            return this.generateBasicTestFromImage(originalName);
+        }
+    }
+
+    // Generate a basic test case for uploaded image (fallback)
+    generateBasicTestFromImage(originalName) {
+        const testName = `UI Test from ${originalName}`;
+        
+        return {
+            testCase: {
+                name: testName,
+                description: `Test case generated from uploaded image: ${originalName}`,
+                url: 'https://example.com',
+                actions: [
+                    {
+                        type: 'navigate',
+                        selector: '',
+                        value: 'https://example.com',
+                        description: 'Navigate to the application'
+                    },
+                    {
+                        type: 'wait',
+                        value: '3000',
+                        description: 'Wait for page to load'
+                    },
+                    {
+                        type: 'assert_visible',
+                        selector: 'body',
+                        description: 'Verify page is loaded'
+                    }
+                ]
+            }
+        };
+    }
     generateBasicTestFromURL(url) {
         const urlObj = new URL(url);
         const domain = urlObj.hostname;

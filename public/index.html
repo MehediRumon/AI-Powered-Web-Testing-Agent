@@ -832,6 +832,7 @@
                             <div class="tab active" onclick="switchTestTab('manual')">Manual</div>
                             <div class="tab" onclick="switchTestTab('ai')">AI Assistant</div>
                             <div class="tab" onclick="switchTestTab('upload')">Upload</div>
+                            <div class="tab" onclick="switchTestTab('image')">Image Analysis</div>
                             <div class="tab" onclick="switchTestTab('record')">Record</div>
                         </div>
 
@@ -883,6 +884,32 @@
                                 <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,.json" style="display: none;" onchange="uploadFile()">
                             </div>
                             <div id="uploadResult"></div>
+                        </div>
+
+                        <!-- Image Analysis -->
+                        <div id="imageTestTab" class="tab-content">
+                            <div class="image-analysis-section">
+                                <h4>🖼️ AI Image Analysis</h4>
+                                <p>Upload a screenshot or image of a web interface to automatically generate test cases using AI vision analysis.</p>
+                                
+                                <div class="file-upload" onclick="document.getElementById('imageInput').click()">
+                                    <p>📷 Click to upload image file (PNG, JPG, JPEG, GIF, BMP, WebP)</p>
+                                    <input type="file" id="imageInput" accept=".png,.jpg,.jpeg,.gif,.bmp,.webp" style="display: none;" onchange="uploadImage()">
+                                </div>
+                                
+                                <div id="imagePreview" class="hidden" style="margin: 1rem 0;">
+                                    <h5>Preview:</h5>
+                                    <img id="previewImg" style="max-width: 100%; max-height: 300px; border: 1px solid #ddd; border-radius: 4px;" />
+                                </div>
+                                
+                                <div id="imageAnalysisResult" class="hidden">
+                                    <h4>AI Generated Test Case:</h4>
+                                    <pre id="imageAnalysisParsedResult"></pre>
+                                    <button onclick="saveImageAnalysisTest()" class="btn-success">Save Test Case</button>
+                                </div>
+                                
+                                <div id="imageUploadResult"></div>
+                            </div>
                         </div>
 
                         <!-- Interaction Recorder -->
@@ -1986,6 +2013,91 @@
                 }
             } catch (error) {
                 showStatus('File upload failed: ' + error.message, 'error');
+            }
+        }
+
+        // Image upload and analysis
+        let lastImageAnalysisTest = null;
+
+        async function uploadImage() {
+            const imageInput = document.getElementById('imageInput');
+            const file = imageInput.files[0];
+            
+            if (!file) return;
+
+            // Show preview
+            const previewImg = document.getElementById('previewImg');
+            const imagePreview = document.getElementById('imagePreview');
+            
+            previewImg.src = URL.createObjectURL(file);
+            imagePreview.classList.remove('hidden');
+
+            // Show loading status
+            showStatus('Analyzing image with AI...', 'info');
+            document.getElementById('imageAnalysisResult').classList.add('hidden');
+
+            const formData = new FormData();
+            formData.append('image', file);
+
+            try {
+                const response = await fetch('/api/upload/image-analysis', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: formData
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    lastImageAnalysisTest = result.analysis.testCase;
+                    document.getElementById('imageAnalysisParsedResult').textContent = JSON.stringify(lastImageAnalysisTest, null, 2);
+                    document.getElementById('imageAnalysisResult').classList.remove('hidden');
+                    document.getElementById('imageUploadResult').innerHTML = 
+                        `<div class="status success">✅ AI analysis completed for ${result.file.originalName}</div>`;
+                    showStatus('Image analyzed successfully! Review the generated test case below.', 'success');
+                } else {
+                    if (result.requiresApiKey) {
+                        showStatus('Please configure your OpenAI API key in the settings to use AI image analysis.', 'error');
+                        document.getElementById('imageUploadResult').innerHTML = 
+                            `<div class="status error">❌ ${result.error}</div>`;
+                    } else {
+                        showStatus(result.error, 'error');
+                        document.getElementById('imageUploadResult').innerHTML = 
+                            `<div class="status error">❌ ${result.error}</div>`;
+                    }
+                }
+            } catch (error) {
+                showStatus('Image analysis failed: ' + error.message, 'error');
+                document.getElementById('imageUploadResult').innerHTML = 
+                    `<div class="status error">❌ Analysis failed: ${error.message}</div>`;
+            }
+        }
+
+        async function saveImageAnalysisTest() {
+            if (!lastImageAnalysisTest) return;
+
+            try {
+                const response = await apiCall('/api/test/cases', {
+                    method: 'POST',
+                    body: JSON.stringify(lastImageAnalysisTest)
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showStatus('AI-generated test case saved successfully', 'success');
+                    document.getElementById('imageAnalysisResult').classList.add('hidden');
+                    document.getElementById('imagePreview').classList.add('hidden');
+                    document.getElementById('imageUploadResult').innerHTML = '';
+                    document.getElementById('imageInput').value = '';
+                    loadTestCases();
+                } else {
+                    showStatus(result.error, 'error');
+                }
+            } catch (error) {
+                showStatus('Failed to save test case: ' + error.message, 'error');
             }
         }
 
