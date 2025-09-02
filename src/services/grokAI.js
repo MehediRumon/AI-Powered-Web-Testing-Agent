@@ -12,24 +12,44 @@ class GrokAIService {
         this.baseURL = 'https://api.x.ai/v1'; // xAI/Grok API endpoint
         this.isConnected = false;
         this.connectionError = null;
+        
+        // Validate API key format on initialization
+        if (this.apiKey && !this.isValidGrokApiKey(this.apiKey)) {
+            this.connectionError = 'Invalid Grok API key format. Key should start with "xai-"';
+            this.apiKey = null; // Invalidate the key
+        }
+    }
+    
+    // Validate Grok API key format
+    isValidGrokApiKey(key) {
+        return key && typeof key === 'string' && key.startsWith('xai-') && key.length > 10;
     }
 
     // Test API connectivity
     async testConnection() {
         if (!this.apiKey || this.apiKey === 'your-grok-api-key-here') {
             this.isConnected = false;
-            this.connectionError = 'Grok API key not configured';
+            this.connectionError = 'Grok API key not configured. Please add GROK_API_KEY or XAI_API_KEY to your .env file.';
+            return false;
+        }
+
+        if (!this.isValidGrokApiKey(this.apiKey)) {
+            this.isConnected = false;
+            this.connectionError = 'Invalid Grok API key format. Key must start with "xai-" and be longer than 10 characters.';
             return false;
         }
 
         try {
             console.log(`🔍 Testing Grok AI API connection...`);
+            
+            // First try to list models to test basic connectivity
             const response = await fetch(`${this.baseURL}/models`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${this.apiKey}`,
                     'Content-Type': 'application/json'
-                }
+                },
+                timeout: 10000 // 10 second timeout
             });
 
             if (response.ok) {
@@ -39,14 +59,49 @@ class GrokAIService {
                 return true;
             } else {
                 this.isConnected = false;
-                this.connectionError = `Grok API responded with status ${response.status}`;
+                let errorMessage;
+                
+                // Handle specific HTTP status codes
+                switch (response.status) {
+                    case 401:
+                        errorMessage = 'Authentication failed. Please check your Grok API key.';
+                        break;
+                    case 403:
+                        errorMessage = 'Access forbidden. Your Grok API key may not have sufficient permissions.';
+                        break;
+                    case 404:
+                        errorMessage = 'API endpoint not found. The xAI service may be temporarily unavailable.';
+                        break;
+                    case 429:
+                        errorMessage = 'Rate limit exceeded. Please try again later.';
+                        break;
+                    case 500:
+                    case 502:
+                    case 503:
+                    case 504:
+                        errorMessage = 'xAI service temporarily unavailable. Please try again later.';
+                        break;
+                    default:
+                        errorMessage = `Grok API responded with status ${response.status}`;
+                }
+                
+                this.connectionError = errorMessage;
                 console.log(`❌ Grok AI API connection failed: ${this.connectionError}`);
                 return false;
             }
         } catch (error) {
             this.isConnected = false;
-            this.connectionError = error.message;
-            console.log(`❌ Grok AI API connection error: ${error.message}`);
+            
+            // Handle specific error types
+            if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                this.connectionError = 'Network error: Unable to reach xAI API. Please check your internet connection.';
+            } else if (error.name === 'AbortError' || error.message.includes('timeout')) {
+                this.connectionError = 'Connection timeout: xAI API is taking too long to respond.';
+            } else {
+                this.connectionError = `Connection error: ${error.message}`;
+            }
+            
+            console.log(`❌ Grok AI API connection error: ${this.connectionError}`);
             return false;
         }
     }
@@ -143,8 +198,9 @@ class GrokAIService {
                 console.log(`⚠️  Grok AI not connected: ${this.connectionError || 'Unknown error'}`);
                 console.log(`💡 To enable Grok AI-powered test generation:`);
                 console.log(`   1. Get a Grok API key from https://console.x.ai/`);
-                console.log(`   2. Add GROK_API_KEY=your-actual-key to your .env file`);
-                console.log(`   3. Restart the application`);
+                console.log(`   2. Ensure your key starts with "xai-" and has vision access`);
+                console.log(`   3. Add GROK_API_KEY=your-actual-key to your .env file`);
+                console.log(`   4. Restart the application`);
                 console.log(`🔄 Using intelligent fallback test generation instead...`);
                 
                 // Clean up screenshot file if AI analysis is not available
@@ -271,7 +327,8 @@ Make sure every action has a clear, descriptive explanation.`
                     ],
                     max_tokens: 2000,
                     temperature: 0.2
-                })
+                }),
+                timeout: 30000 // 30 second timeout for image processing
             });
 
             console.log(`📬 Grok AI vision request sent, waiting for response...`);
@@ -283,13 +340,28 @@ Make sure every action has a clear, descriptive explanation.`
                 console.error(`❌ Error details:`, data);
                 
                 // Provide specific error messages based on status codes
-                let errorMessage = `Grok AI API error: ${data.error?.message || 'Unknown error'}`;
-                if (response.status === 401) {
-                    errorMessage = 'Grok AI authentication failed. Please check your API key.';
-                } else if (response.status === 429) {
-                    errorMessage = 'Grok AI rate limit exceeded. Please try again later.';
-                } else if (response.status === 413) {
-                    errorMessage = 'Screenshot too large for Grok AI processing. Try a smaller page or different settings.';
+                let errorMessage;
+                switch (response.status) {
+                    case 401:
+                        errorMessage = 'Grok AI authentication failed. Please check your API key.';
+                        break;
+                    case 403:
+                        errorMessage = 'Grok AI access forbidden. Your API key may not have sufficient permissions or vision access.';
+                        break;
+                    case 413:
+                        errorMessage = 'Screenshot too large for Grok AI processing. Try a smaller page or different settings.';
+                        break;
+                    case 429:
+                        errorMessage = 'Grok AI rate limit exceeded. Please try again later.';
+                        break;
+                    case 500:
+                    case 502:
+                    case 503:
+                    case 504:
+                        errorMessage = 'Grok AI service temporarily unavailable. Please try again later.';
+                        break;
+                    default:
+                        errorMessage = `Grok AI API error: ${data.error?.message || `HTTP ${response.status}`}`;
                 }
                 
                 throw new Error(errorMessage);

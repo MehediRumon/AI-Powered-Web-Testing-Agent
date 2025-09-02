@@ -78,6 +78,11 @@ GROQ_API_KEY=gsk_your-actual-groq-key-here
 
 > 💡 **Note**: The application works without API keys but AI features will use fallback parsing instead of advanced AI analysis.
 
+**🔧 API Troubleshooting:**
+- For Grok AI setup issues, see [GROK_API_SETUP.md](GROK_API_SETUP.md)
+- Run `node troubleshoot-grok.js` to diagnose Grok API problems
+- Common error: "Connection failed: Grok API responded with status 403" → Check your API key at [console.x.ai](https://console.x.ai/)
+
 ### 3. Start the Application
 
 ```bash

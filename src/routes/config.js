@@ -47,7 +47,7 @@ router.put('/api-keys', authenticateToken, (req, res) => {
     }
     
     if (grok_api_key && !grok_api_key.startsWith('xai-')) {
-        return res.status(400).json({ error: 'Grok API key must start with "xai-"' });
+        return res.status(400).json({ error: 'Grok API key must start with "xai-" and be obtained from https://console.x.ai/' });
     }
     
     // Validate preferred provider
