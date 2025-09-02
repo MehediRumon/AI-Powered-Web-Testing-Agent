@@ -29,13 +29,13 @@ class GrokAIService {
     async testConnection() {
         if (!this.apiKey || this.apiKey === 'your-grok-api-key-here') {
             this.isConnected = false;
-            this.connectionError = 'Grok API key not configured. Please add GROK_API_KEY or XAI_API_KEY to your .env file.';
+            this.connectionError = 'Grok API key not configured. Please get your API key from https://console.x.ai/ and add GROK_API_KEY or XAI_API_KEY to your .env file, then restart the application.';
             return false;
         }
 
         if (!this.isValidGrokApiKey(this.apiKey)) {
             this.isConnected = false;
-            this.connectionError = 'Invalid Grok API key format. Key must start with "xai-" and be longer than 10 characters.';
+            this.connectionError = 'Invalid Grok API key format. Keys must start with "xai-" and be longer than 10 characters. Get a valid key from https://console.x.ai/';
             return false;
         }
 
@@ -64,25 +64,25 @@ class GrokAIService {
                 // Handle specific HTTP status codes
                 switch (response.status) {
                     case 401:
-                        errorMessage = 'Authentication failed. Please check your Grok API key.';
+                        errorMessage = 'Authentication failed. Your Grok API key appears to be invalid or has been revoked. Please verify your key at https://console.x.ai/';
                         break;
                     case 403:
-                        errorMessage = 'Access forbidden. Your Grok API key may not have sufficient permissions.';
+                        errorMessage = 'Access forbidden. Your Grok API key may not have sufficient permissions or your account may have restrictions. Please check your account status at https://console.x.ai/';
                         break;
                     case 404:
-                        errorMessage = 'API endpoint not found. The xAI service may be temporarily unavailable.';
+                        errorMessage = 'API endpoint not found. The xAI service may be temporarily unavailable or your API version may be outdated.';
                         break;
                     case 429:
-                        errorMessage = 'Rate limit exceeded. Please try again later.';
+                        errorMessage = 'Rate limit exceeded. Please wait a moment before trying again, or check your usage quotas at https://console.x.ai/';
                         break;
                     case 500:
                     case 502:
                     case 503:
                     case 504:
-                        errorMessage = 'xAI service temporarily unavailable. Please try again later.';
+                        errorMessage = 'xAI service temporarily unavailable. Please try again in a few minutes or check service status at https://status.x.ai/';
                         break;
                     default:
-                        errorMessage = `Grok API responded with status ${response.status}`;
+                        errorMessage = `Grok API responded with status ${response.status}. Please check your API key and account status at https://console.x.ai/`;
                 }
                 
                 this.connectionError = errorMessage;
@@ -343,25 +343,25 @@ Make sure every action has a clear, descriptive explanation.`
                 let errorMessage;
                 switch (response.status) {
                     case 401:
-                        errorMessage = 'Grok AI authentication failed. Please check your API key.';
+                        errorMessage = 'Grok AI authentication failed. Your API key may be invalid or revoked. Please verify at https://console.x.ai/';
                         break;
                     case 403:
-                        errorMessage = 'Grok AI access forbidden. Your API key may not have sufficient permissions or vision access.';
+                        errorMessage = 'Grok AI access forbidden. Your API key may not have sufficient permissions or vision access. Check your account at https://console.x.ai/';
                         break;
                     case 413:
-                        errorMessage = 'Screenshot too large for Grok AI processing. Try a smaller page or different settings.';
+                        errorMessage = 'Screenshot too large for Grok AI processing. Try testing with a smaller page or different screenshot settings.';
                         break;
                     case 429:
-                        errorMessage = 'Grok AI rate limit exceeded. Please try again later.';
+                        errorMessage = 'Grok AI rate limit exceeded. Please wait before trying again or check your usage quotas.';
                         break;
                     case 500:
                     case 502:
                     case 503:
                     case 504:
-                        errorMessage = 'Grok AI service temporarily unavailable. Please try again later.';
+                        errorMessage = 'Grok AI service temporarily unavailable. Please try again later or check https://status.x.ai/';
                         break;
                     default:
-                        errorMessage = `Grok AI API error: ${data.error?.message || `HTTP ${response.status}`}`;
+                        errorMessage = `Grok AI API error: ${data.error?.message || `HTTP ${response.status}`}. Please check your configuration at https://console.x.ai/`;
                 }
                 
                 throw new Error(errorMessage);

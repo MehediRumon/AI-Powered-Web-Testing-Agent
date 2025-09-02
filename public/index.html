@@ -1453,7 +1453,33 @@
                     statusElement.innerHTML = `✅ ${result.message}`;
                     statusElement.style.color = '#28a745';
                 } else {
-                    statusElement.innerHTML = `❌ ${result.message}`;
+                    let errorHTML = `❌ ${result.message}`;
+                    
+                    // Add troubleshooting steps if available
+                    if (result.troubleshooting && Array.isArray(result.troubleshooting)) {
+                        errorHTML += '<div style="margin-top: 10px; padding: 10px; background-color: #f8f9fa; border-left: 4px solid #007bff; border-radius: 4px;">';
+                        errorHTML += '<strong>💡 Troubleshooting Steps:</strong><br>';
+                        result.troubleshooting.forEach(step => {
+                            if (step.trim() === '') {
+                                errorHTML += '<br>';
+                            } else if (step.startsWith('•')) {
+                                errorHTML += `<div style="margin-left: 15px; color: #666;">${step}</div>`;
+                            } else {
+                                errorHTML += `<div style="font-weight: ${step.includes('🔍') || step.includes('💳') || step.includes('🔄') || step.includes('🔐') || step.includes('🌐') || step.includes('⏰') || step.includes('🔧') ? 'bold' : 'normal'}; margin-top: 5px;">${step}</div>`;
+                            }
+                        });
+                        errorHTML += '</div>';
+                        
+                        // Add quick action button for Grok setup
+                        if (service === 'grok') {
+                            errorHTML += '<div style="margin-top: 10px;">';
+                            errorHTML += '<a href="https://console.x.ai/" target="_blank" style="background-color: #007bff; color: white; padding: 8px 16px; text-decoration: none; border-radius: 4px; display: inline-block; margin-right: 10px;">🔧 Go to xAI Console</a>';
+                            errorHTML += '<button onclick="runTroubleshootingScript()" style="background-color: #28a745; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">🔍 Run Diagnostics</button>';
+                            errorHTML += '</div>';
+                        }
+                    }
+                    
+                    statusElement.innerHTML = errorHTML;
                     statusElement.style.color = '#dc3545';
                 }
             } catch (error) {
@@ -1469,6 +1495,59 @@
             } else {
                 input.type = 'password';
             }
+        }
+
+        // Function to run troubleshooting script for Grok API
+        function runTroubleshootingScript() {
+            showStatus('🔍 Running Grok API diagnostics...', 'info');
+            
+            // Create a modal or popup with instructions
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                background-color: rgba(0,0,0,0.5); z-index: 1000; 
+                display: flex; align-items: center; justify-content: center;
+            `;
+            
+            const content = document.createElement('div');
+            content.style.cssText = `
+                background: white; padding: 20px; border-radius: 8px; 
+                max-width: 600px; max-height: 80vh; overflow-y: auto;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            `;
+            
+            content.innerHTML = `
+                <h3>🔧 Grok API Troubleshooting</h3>
+                <p>To run detailed diagnostics, execute the following command in your terminal:</p>
+                <div style="background-color: #f8f9fa; padding: 10px; border-radius: 4px; margin: 10px 0; font-family: monospace;">
+                    node troubleshoot-grok.js
+                </div>
+                <h4>Quick Manual Check:</h4>
+                <ol>
+                    <li>Go to <a href="https://console.x.ai/" target="_blank">https://console.x.ai/</a></li>
+                    <li>Verify your API key is active and has the correct permissions</li>
+                    <li>Check your account billing status</li>
+                    <li>Ensure you have access to vision models</li>
+                    <li>Update your .env file with: <code>GROK_API_KEY=xai-your-key-here</code></li>
+                    <li>Restart the application</li>
+                </ol>
+                <div style="margin-top: 20px;">
+                    <button onclick="this.parentElement.parentElement.parentElement.remove()" 
+                            style="background-color: #007bff; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer;">
+                        Close
+                    </button>
+                </div>
+            `;
+            
+            modal.appendChild(content);
+            document.body.appendChild(modal);
+            
+            // Close modal when clicking outside
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.remove();
+                }
+            });
         }
 
         // Token validation function

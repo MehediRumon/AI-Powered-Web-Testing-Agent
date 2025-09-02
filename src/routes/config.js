@@ -3,6 +3,142 @@ const router = express.Router();
 const { getDatabase } = require('../database/init');
 const { authenticateToken } = require('../middleware/auth');
 
+// Helper function to get enhanced Grok error messages with actionable guidance
+function getEnhancedGrokErrorMessage(originalError) {
+    if (!originalError) {
+        return 'Connection failed: Unknown error occurred. Please check your Grok API key and try again.';
+    }
+
+    const errorLower = originalError.toLowerCase();
+    
+    if (errorLower.includes('403') || errorLower.includes('forbidden') || errorLower.includes('permissions')) {
+        return `🚫 Access Forbidden: Your Grok API key doesn't have sufficient permissions. This usually means:
+        
+• Your API key might be invalid or revoked
+• Your xAI account may not have access to the vision models required
+• Your account billing or usage limits may have been exceeded
+
+💡 Quick Fix: Visit https://console.x.ai/ to verify your API key and account status.`;
+    }
+    
+    if (errorLower.includes('401') || errorLower.includes('authentication')) {
+        return `🔐 Authentication Failed: Your Grok API key is invalid or malformed.
+        
+• Double-check your API key is correctly copied from https://console.x.ai/
+• Ensure there are no extra spaces or characters
+• Verify your key starts with "xai-"
+
+💡 Quick Fix: Generate a new API key if the current one doesn't work.`;
+    }
+    
+    if (errorLower.includes('network') || errorLower.includes('timeout')) {
+        return `🌐 Network Error: Unable to reach xAI servers.
+        
+• Check your internet connection
+• Verify firewall settings allow HTTPS to api.x.ai
+• Try again in a few minutes if xAI service is temporarily down
+
+💡 Quick Fix: Check https://status.x.ai/ for service status.`;
+    }
+    
+    if (errorLower.includes('not configured') || errorLower.includes('api key')) {
+        return `⚙️ API Key Not Configured: Please set up your Grok API key.
+        
+• Get your API key from https://console.x.ai/
+• Add it to your .env file as GROK_API_KEY=your-key-here
+• Restart the application after updating .env
+
+💡 Quick Fix: Run 'node troubleshoot-grok.js' for detailed setup guidance.`;
+    }
+    
+    // Generic error with enhanced guidance
+    return `❌ Connection Failed: ${originalError}
+
+💡 Troubleshooting Steps:
+1. Verify your Grok API key at https://console.x.ai/
+2. Check your account status and billing
+3. Ensure your key has vision model access
+4. Run 'node troubleshoot-grok.js' for detailed diagnostics
+
+🔄 The application will use fallback test generation if Grok AI is unavailable.`;
+}
+
+// Helper function to get specific troubleshooting steps based on error type
+function getGrokTroubleshootingSteps(originalError) {
+    if (!originalError) {
+        return [
+            'Check your Grok API key configuration',
+            'Visit https://console.x.ai/ to verify your account',
+            'Run diagnostic: node troubleshoot-grok.js'
+        ];
+    }
+
+    const errorLower = originalError.toLowerCase();
+    
+    if (errorLower.includes('403') || errorLower.includes('forbidden')) {
+        return [
+            '🔍 Verify API Key Status',
+            '• Go to https://console.x.ai/ and check if your API key is active',
+            '• Confirm your account is in good standing',
+            '• Check if you have access to vision models',
+            '',
+            '💳 Check Account Billing',
+            '• Ensure your account has available credits or active billing',
+            '• Check usage limits and quotas',
+            '',
+            '🔄 Generate New Key',
+            '• If the above doesn\'t work, generate a new API key',
+            '• Update your .env file with the new key',
+            '• Restart the application'
+        ];
+    }
+    
+    if (errorLower.includes('401') || errorLower.includes('authentication')) {
+        return [
+            '🔐 Fix Authentication Issues',
+            '• Copy your API key exactly from https://console.x.ai/',
+            '• Ensure the key starts with "xai-"',
+            '• Check for extra spaces or invisible characters',
+            '• Verify your .env file syntax: GROK_API_KEY=xai-your-key',
+            '',
+            '🔄 Test Your Setup',
+            '• Save changes and restart the application',
+            '• Run: node troubleshoot-grok.js',
+            '• Test the connection again'
+        ];
+    }
+    
+    if (errorLower.includes('network')) {
+        return [
+            '🌐 Network Troubleshooting',
+            '• Check your internet connection',
+            '• Verify DNS resolution: nslookup api.x.ai',
+            '• Check firewall settings for HTTPS traffic',
+            '• Try from a different network if possible',
+            '',
+            '⏰ Service Status',
+            '• Check https://status.x.ai/ for outages',
+            '• Wait a few minutes and try again',
+            '• Consider using fallback options'
+        ];
+    }
+    
+    // Generic troubleshooting
+    return [
+        '🔧 General Troubleshooting',
+        '• Run diagnostic: node troubleshoot-grok.js',
+        '• Check API key at https://console.x.ai/',
+        '• Verify account status and billing',
+        '• Ensure .env file is properly configured',
+        '• Restart application after changes',
+        '',
+        '🔄 Fallback Options',
+        '• The application will use intelligent fallback',
+        '• Consider using Groq or OpenAI as alternatives',
+        '• Basic test generation will still work'
+    ];
+}
+
 // Get user's API configuration
 router.get('/api-keys', authenticateToken, (req, res) => {
     const db = getDatabase();
@@ -150,7 +286,8 @@ router.post('/test-connection', authenticateToken, async (req, res) => {
                 error: grokAIService.connectionError,
                 message: isConnected 
                     ? 'Grok AI connection successful! xAI-powered test generation is available.'
-                    : `Connection failed: ${grokAIService.connectionError}. Please check your Grok API key.`
+                    : getEnhancedGrokErrorMessage(grokAIService.connectionError),
+                troubleshooting: isConnected ? null : getGrokTroubleshootingSteps(grokAIService.connectionError)
             });
         } else if (service === 'openai') {
             // Test OpenAI connection
