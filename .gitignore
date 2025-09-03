@@ -16,3 +16,6 @@ coverage/
 .playwright/
 tests/*test.js
 !tests/test.js
+# Test files for verification
+test-headless-fix.js
+test-fix-verification.js
