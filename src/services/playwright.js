@@ -560,6 +560,12 @@ class PlaywrightTestService {
 
     async addVisualIndicator(selector) {
         try {
+            // Check if page is available before attempting operations
+            if (!this.page || this.page.isClosed()) {
+                console.warn(`Cannot add visual indicator for ${selector}: page is not available`);
+                return;
+            }
+
             // Inject styles if not already done
             await this.injectVisualIndicatorStyles();
             
@@ -608,6 +614,12 @@ class PlaywrightTestService {
 
     async removeVisualIndicator(selector) {
         try {
+            // Check if page is available before attempting to execute
+            if (!this.page || this.page.isClosed()) {
+                console.warn(`Cannot remove visual indicator for ${selector}: page is not available`);
+                return;
+            }
+
             await this.page.evaluate((sel) => {
                 let element = null;
                 
@@ -642,6 +654,12 @@ class PlaywrightTestService {
 
     async showInteractionIndicator(selector, actionType, duration = 2000) {
         try {
+            // Check if page is available before attempting operations
+            if (!this.page || this.page.isClosed()) {
+                console.warn(`Cannot show interaction indicator for ${selector}: page is not available`);
+                return;
+            }
+
             await this.addVisualIndicator(selector);
             
             // Update the indicator text based on action type
@@ -688,9 +706,17 @@ class PlaywrightTestService {
                 }
             }, { sel: selector, action: actionType, dur: duration });
             
-            // Remove indicator after duration
-            setTimeout(async () => {
-                await this.removeVisualIndicator(selector);
+            // Store reference to current instance for timeout callback
+            const currentInstance = this;
+            
+            // Remove indicator after duration - use arrow function to preserve 'this' context
+            setTimeout(() => {
+                // Double-check that the page is still available before attempting removal
+                if (currentInstance.page && !currentInstance.page.isClosed()) {
+                    currentInstance.removeVisualIndicator(selector).catch(error => {
+                        console.warn(`Failed to remove visual indicator in timeout for ${selector}:`, error.message);
+                    });
+                }
             }, duration);
             
         } catch (error) {
