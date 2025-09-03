@@ -443,7 +443,7 @@ class OpenAIService {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    model: 'gpt-4o', // Using GPT-4o for vision capabilities
+                    model: 'gpt-4o-mini', // Using gpt-4o-mini for better cost efficiency
                     messages: [
                         {
                             role: 'system',
@@ -630,7 +630,7 @@ Use specific selectors when possible, or text-based selectors like "text=Button 
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    model: 'gpt-4o', // Using GPT-4o for vision capabilities
+                    model: 'gpt-4o-mini', // Using gpt-4o-mini for cost efficiency
                     messages: [
                         {
                             role: 'system',
