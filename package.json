@@ -30,6 +30,7 @@
     "multer": "^2.0.2",
     "node-fetch": "^3.3.2",
     "playwright": "^1.55.0",
+    "sharp": "^0.34.3",
     "sqlite3": "^5.1.7",
     "supertest": "^7.1.4",
     "xlsx": "^0.18.5"
