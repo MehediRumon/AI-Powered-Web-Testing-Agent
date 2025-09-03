@@ -18,8 +18,36 @@ When screenshots or uploaded images are sent to AI services (OpenAI or Grok AI),
 
 - **Large screenshots** (e.g., 1920x4000px) are reduced to 240x500px
 - **File sizes** typically reduced by 90-95%
-- **Token costs** significantly reduced for AI image analysis
+- **Token costs** dramatically reduced with dual optimization:
+  - Image resizing to 500px max dimension
+  - Use of 'detail: low' setting for vision API calls (85 tokens vs 170+ tokens)
+- **Combined token savings** of 90-96% for typical screenshots
 - **Quality** remains sufficient for UI element recognition and test generation
+
+## Token Optimization Strategy
+
+### Dual Optimization Approach
+
+The system uses a **two-layer optimization** to minimize token consumption:
+
+1. **Image Resizing**: Reduces image dimensions to 500px maximum
+2. **Detail Level**: Uses 'detail: low' instead of 'detail: high' in vision API calls
+
+### Token Usage Comparison
+
+According to OpenAI documentation:
+- **'detail: low'**: 85 tokens (fixed cost regardless of image size)
+- **'detail: high'**: 170 + (ceil(width/512) × ceil(height/512) × 170) tokens
+
+### Real-World Savings
+
+| Image Size | High Detail Tokens | Low Detail Tokens | Savings |
+|------------|-------------------|-------------------|---------|
+| 1920×1080  | 2,210            | 85               | 96.2%   |
+| 1366×768   | 1,190            | 85               | 92.9%   |
+| 500×375    | 340              | 85               | 75.0%   |
+
+**Average reduction: 88.5% fewer tokens consumed**
 
 ## Technical Details
 

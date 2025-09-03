@@ -500,7 +500,7 @@ Use specific selectors when possible, or text-based selectors like "text=Button 
                                     type: 'image_url',
                                     image_url: {
                                         url: `data:${mimeType};base64,${base64Image}`,
-                                        detail: 'high'
+                                        detail: 'low'
                                     }
                                 }
                             ]
@@ -683,7 +683,7 @@ Generate realistic test scenarios that would validate the key functionality visi
                                     type: 'image_url',
                                     image_url: {
                                         url: `data:${mimeType};base64,${base64Image}`,
-                                        detail: 'high'
+                                        detail: 'low'
                                     }
                                 }
                             ]

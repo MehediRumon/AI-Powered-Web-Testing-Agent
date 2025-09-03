@@ -321,7 +321,7 @@ Make sure every action has a clear, descriptive explanation.`
                                     type: 'image_url',
                                     image_url: {
                                         url: `data:${mimeType};base64,${base64Image}`,
-                                        detail: 'high'
+                                        detail: 'low'
                                     }
                                 }
                             ]
