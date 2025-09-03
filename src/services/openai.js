@@ -363,8 +363,8 @@ class OpenAIService {
         let screenshotPath = null;
 
         try {
-            // Initialize browser and navigate to URL
-            await playwrightService.initialize('chromium', true);
+            // Initialize browser and navigate to URL (non-headless for visual display)
+            await playwrightService.initialize('chromium', false);
             await playwrightService.page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
             
             // Wait a bit for dynamic content to load
