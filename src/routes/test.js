@@ -819,7 +819,7 @@ router.post('/ai/generate-from-url', authenticateToken, async (req, res) => {
                 testCase.actions = JSON.parse(testCase.actions);
                 testCase.id = saveResult.id;
 
-                await testService.initialize('chromium', true);
+                await testService.initialize('chromium', false);
                 const result = await testService.runTest(testCase, { interactionDelay: 2 });
 
                 // Save test result
@@ -932,7 +932,7 @@ router.post('/ai/browse-and-generate', authenticateToken, async (req, res) => {
                 testCase.actions = JSON.parse(testCase.actions);
                 testCase.id = saveResult.id;
 
-                await testService.initialize('chromium', true);
+                await testService.initialize('chromium', false);
                 const result = await testService.runTest(testCase, { interactionDelay: 2 });
 
                 // Save test result
