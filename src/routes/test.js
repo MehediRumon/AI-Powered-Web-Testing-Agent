@@ -785,36 +785,9 @@ router.post('/ai/generate-from-url', authenticateToken, async (req, res) => {
 
         console.log(`Generate from URL request for: ${url}, autoExecute: ${autoExecute}`);
 
-        // Try Grok AI first (preferred for vision analysis), fallback to Groq if needed
-        let generated;
-        
-        try {
-            const GrokAIService = require('../services/grokAI');
-            const grokAIService = new GrokAIService();
-            
-            // Test Grok AI connection first
-            const isGrokConnected = await grokAIService.testConnection();
-            
-            if (isGrokConnected) {
-                console.log('Using Grok AI for vision-based analysis...');
-                generated = await grokAIService.browseAndGenerateTest(url);
-            } else {
-                console.log('Grok AI not available, falling back to Groq service...');
-                const GrokService = require('../services/grok');
-                const grokService = new GrokService();
-                generated = await grokService.browseAndGenerateTest(url);
-            }
-        } catch (grokError) {
-            console.log('Grok AI failed, trying Groq fallback:', grokError.message);
-            try {
-                const GrokService = require('../services/grok');
-                const grokService = new GrokService();
-                generated = await grokService.browseAndGenerateTest(url);
-            } catch (groqError) {
-                console.error('Both Grok AI and Groq failed:', groqError.message);
-                throw new Error('AI services unavailable. Please check your API configuration.');
-            }
-        }
+        // Use OpenAI service for vision-based analysis
+        const aiService = await OpenAIService.createForUser(req.user.id);
+        const generated = await aiService.generateTestFromURL(url);
 
         // If autoExecute is true, save and execute the test case immediately
         if (autoExecute && generated.testCase) {
@@ -886,7 +859,7 @@ router.post('/ai/generate-from-url', authenticateToken, async (req, res) => {
         } else {
             // Just return the generated test case without executing
             res.json({
-                message: 'Test case generated successfully from Grok AI vision analysis',
+                message: 'Test case generated successfully from OpenAI vision analysis',
                 testCase: generated.testCase
             });
         }
@@ -894,11 +867,11 @@ router.post('/ai/generate-from-url', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('AI generation error:', error);
         
-        if (error.message.includes('API') || error.message.includes('Grok') || error.message.includes('xAI') || error.message.includes('Groq')) {
+        if (error.message.includes('API') || error.message.includes('OpenAI')) {
             return res.status(503).json({ 
-                error: 'AI services temporarily unavailable. Please check your API configuration and try again later.',
+                error: 'AI service temporarily unavailable. Please check your OpenAI API configuration and try again later.',
                 fallback: 'You can create test cases manually or use the basic generator.',
-                suggestion: 'Make sure you have either GROK_API_KEY or GROQ_API_KEY configured in your .env file.'
+                suggestion: 'Make sure you have OPENAI_API_KEY configured in your .env file or user settings.'
             });
         }
         
