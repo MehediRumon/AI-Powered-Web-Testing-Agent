@@ -143,7 +143,21 @@ class OpenAIService {
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(`OpenAI API error: ${data.error?.message || 'Unknown error'}`);
+                // Check for specific error types to provide better user experience
+                const errorType = data.error?.type || 'unknown';
+                const errorCode = data.error?.code || 'unknown';
+                const errorMessage = data.error?.message || 'Unknown error';
+                
+                if (errorType === 'insufficient_quota' || errorCode === 'insufficient_quota') {
+                    console.warn('OpenAI API quota exceeded for instruction parsing, falling back to rule-based parsing');
+                    throw new Error(`quota_exceeded:${errorMessage}`);
+                } else if (response.status === 429) {
+                    console.warn('OpenAI API rate limit exceeded for instruction parsing, falling back to rule-based parsing');
+                    throw new Error(`rate_limit:${errorMessage}`);
+                } else {
+                    console.error('OpenAI API error during instruction parsing:', data);
+                    throw new Error(`OpenAI API error: ${errorMessage}`);
+                }
             }
 
             const content = data.choices[0]?.message?.content;
@@ -163,8 +177,27 @@ class OpenAIService {
             throw new Error('Could not extract JSON from OpenAI response');
 
         } catch (error) {
-            console.warn('OpenAI parsing failed, using fallback:', error.message);
-            return this.fallbackParse(instructions);
+            // Check if this is a quota or rate limit error for better user messaging
+            if (error.message.startsWith('quota_exceeded:')) {
+                console.warn('Gracefully falling back to rule-based parsing due to quota limits');
+            } else if (error.message.startsWith('rate_limit:')) {
+                console.warn('Gracefully falling back to rule-based parsing due to rate limits');
+            } else {
+                console.warn('OpenAI parsing failed, using fallback:', error.message);
+            }
+            
+            const fallbackResult = this.fallbackParse(instructions);
+            
+            // Add metadata about fallback usage
+            if (error.message.startsWith('quota_exceeded:') || error.message.startsWith('rate_limit:')) {
+                fallbackResult.metadata = {
+                    usedFallback: true,
+                    fallbackReason: error.message.startsWith('quota_exceeded:') ? 'quota_exceeded' : 'rate_limit',
+                    originalError: error.message.split(':')[1] || 'Unknown error'
+                };
+            }
+            
+            return fallbackResult;
         }
     }
 
@@ -477,8 +510,21 @@ Use specific selectors when possible, or text-based selectors like "text=Button 
             const data = await response.json();
             
             if (!response.ok) {
-                console.error('OpenAI API error:', data);
-                throw new Error(`OpenAI API error: ${data.error?.message || 'Unknown error'}`);
+                // Check for specific error types to provide better user experience
+                const errorType = data.error?.type || 'unknown';
+                const errorCode = data.error?.code || 'unknown';
+                const errorMessage = data.error?.message || 'Unknown error';
+                
+                if (errorType === 'insufficient_quota' || errorCode === 'insufficient_quota') {
+                    console.warn('OpenAI API quota exceeded for screenshot analysis, falling back to basic test generation');
+                    throw new Error(`quota_exceeded:${errorMessage}`);
+                } else if (response.status === 429) {
+                    console.warn('OpenAI API rate limit exceeded for screenshot analysis, falling back to basic test generation');
+                    throw new Error(`rate_limit:${errorMessage}`);
+                } else {
+                    console.error('OpenAI API error during screenshot analysis:', data);
+                    throw new Error(`OpenAI API error: ${errorMessage}`);
+                }
             }
 
             const content = data.choices[0]?.message?.content;
@@ -509,6 +555,20 @@ Use specific selectors when possible, or text-based selectors like "text=Button 
         } catch (error) {
             console.error('AI screenshot analysis failed:', error);
             
+            // Check if this is a quota or rate limit error for better user messaging
+            let usedFallback = false;
+            let fallbackReason = '';
+            
+            if (error.message.startsWith('quota_exceeded:')) {
+                console.warn('Gracefully falling back to basic test generation due to quota limits');
+                usedFallback = true;
+                fallbackReason = 'quota_exceeded';
+            } else if (error.message.startsWith('rate_limit:')) {
+                console.warn('Gracefully falling back to basic test generation due to rate limits');
+                usedFallback = true;
+                fallbackReason = 'rate_limit';
+            }
+            
             // Clean up screenshot file
             if (fs.existsSync(screenshotPath)) {
                 try {
@@ -519,7 +579,18 @@ Use specific selectors when possible, or text-based selectors like "text=Button 
             }
             
             // Fallback to basic test generation
-            return this.generateBasicTestFromURL(url);
+            const fallbackResult = this.generateBasicTestFromURL(url);
+            
+            // Add metadata about fallback usage
+            if (usedFallback) {
+                fallbackResult.metadata = {
+                    usedFallback: true,
+                    fallbackReason: fallbackReason,
+                    originalError: error.message.split(':')[1] || 'Unknown error'
+                };
+            }
+            
+            return fallbackResult;
         }
     }
 
@@ -631,8 +702,21 @@ Generate realistic test scenarios that would validate the key functionality visi
             const data = await response.json();
             
             if (!response.ok) {
-                console.error('OpenAI API error:', data);
-                throw new Error(`OpenAI API error: ${data.error?.message || 'Unknown error'}`);
+                // Check for specific error types to provide better user experience
+                const errorType = data.error?.type || 'unknown';
+                const errorCode = data.error?.code || 'unknown';
+                const errorMessage = data.error?.message || 'Unknown error';
+                
+                if (errorType === 'insufficient_quota' || errorCode === 'insufficient_quota') {
+                    console.warn('OpenAI API quota exceeded for image analysis, falling back to basic test generation');
+                    throw new Error(`quota_exceeded:${errorMessage}`);
+                } else if (response.status === 429) {
+                    console.warn('OpenAI API rate limit exceeded for image analysis, falling back to basic test generation');
+                    throw new Error(`rate_limit:${errorMessage}`);
+                } else {
+                    console.error('OpenAI API error during image analysis:', data);
+                    throw new Error(`OpenAI API error: ${errorMessage}`);
+                }
             }
 
             const content = data.choices[0]?.message?.content;
@@ -655,8 +739,33 @@ Generate realistic test scenarios that would validate the key functionality visi
         } catch (error) {
             console.error('AI image analysis failed:', error);
             
+            // Check if this is a quota or rate limit error for better user messaging
+            let usedFallback = false;
+            let fallbackReason = '';
+            
+            if (error.message.startsWith('quota_exceeded:')) {
+                console.warn('Gracefully falling back to basic test generation due to quota limits');
+                usedFallback = true;
+                fallbackReason = 'quota_exceeded';
+            } else if (error.message.startsWith('rate_limit:')) {
+                console.warn('Gracefully falling back to basic test generation due to rate limits');
+                usedFallback = true;
+                fallbackReason = 'rate_limit';
+            }
+            
             // Fallback: Generate basic test case for uploaded image
-            return this.generateBasicTestFromImage(originalName);
+            const fallbackResult = this.generateBasicTestFromImage(originalName);
+            
+            // Add metadata about fallback usage
+            if (usedFallback) {
+                fallbackResult.metadata = {
+                    usedFallback: true,
+                    fallbackReason: fallbackReason,
+                    originalError: error.message.split(':')[1] || 'Unknown error'
+                };
+            }
+            
+            return fallbackResult;
         }
     }
 
