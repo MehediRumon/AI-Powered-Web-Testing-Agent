@@ -2,6 +2,7 @@
 const PlaywrightTestService = require('./playwright');
 const fs = require('fs');
 const path = require('path');
+const { getOptimizedImageBase64, cleanupResizedImage } = require('../utils/imageUtils');
 
 // Ensure fetch is available (Node.js 18+ has global fetch, fallback for older versions)
 const fetch = globalThis.fetch || require('node-fetch');
@@ -236,21 +237,22 @@ class GrokAIService {
 
     // Analyze screenshot with Grok AI vision model
     async analyzeScreenshotWithGrokAI(url, screenshotPath) {
+        let resizedImagePath = null;
         try {
             console.log(`🤖 Starting Grok AI vision analysis for URL: ${url}`);
             
-            // Read screenshot file and convert to base64
-            const imageBuffer = fs.readFileSync(screenshotPath);
-            const fileSizeMB = (imageBuffer.length / (1024 * 1024)).toFixed(2);
-            console.log(`📷 Screenshot loaded: ${screenshotPath} (${fileSizeMB} MB)`);
+            // Resize and optimize image for AI analysis to reduce token costs
+            console.log(`🔧 Optimizing screenshot for Grok AI analysis to reduce token costs...`);
+            const imageData = await getOptimizedImageBase64(screenshotPath, 500);
+            const { base64: base64Image, mimeType, resizedPath } = imageData;
+            resizedImagePath = resizedPath;
+            
+            console.log(`📷 Screenshot optimized and ready for Grok AI processing`);
             
             // Validate file size (Grok AI has limits on image size)
-            if (imageBuffer.length > 20 * 1024 * 1024) { // 20MB limit
-                console.warn(`⚠️  Screenshot is large (${fileSizeMB} MB). This may affect processing time or cause API limits.`);
+            if (base64Image.length > 20 * 1024 * 1024) { // 20MB limit for base64
+                console.warn(`⚠️  Base64 image is large. This may affect processing time or cause API limits.`);
             }
-            
-            const base64Image = imageBuffer.toString('base64');
-            console.log(`📷 Screenshot converted to base64 successfully (${base64Image.length} characters)`);
 
             console.log(`📡 Sending screenshot to Grok AI vision model...`);
             const response = await fetch(`${this.baseURL}/chat/completions`, {
@@ -318,7 +320,7 @@ Make sure every action has a clear, descriptive explanation.`
                                 {
                                     type: 'image_url',
                                     image_url: {
-                                        url: `data:image/png;base64,${base64Image}`,
+                                        url: `data:${mimeType};base64,${base64Image}`,
                                         detail: 'high'
                                     }
                                 }
@@ -416,6 +418,11 @@ Make sure every action has a clear, descriptive explanation.`
                     // Clean up screenshot after successful analysis
                     this.cleanupScreenshot(screenshotPath);
                     
+                    // Clean up resized image if it was created and different from original
+                    if (resizedImagePath !== screenshotPath) {
+                        cleanupResizedImage(resizedImagePath);
+                    }
+                    
                     console.log(`🎉 Test case generated successfully from Grok AI vision analysis`);
                     return result;
                 } catch (parseError) {
@@ -434,6 +441,11 @@ Make sure every action has a clear, descriptive explanation.`
             
             // Clean up screenshot on error
             this.cleanupScreenshot(screenshotPath);
+            
+            // Clean up resized image if it was created and different from original
+            if (resizedImagePath && resizedImagePath !== screenshotPath) {
+                cleanupResizedImage(resizedImagePath);
+            }
             
             console.log(`🔄 Falling back to intelligent basic test generation`);
             return this.generateBasicTestFromURL(url);

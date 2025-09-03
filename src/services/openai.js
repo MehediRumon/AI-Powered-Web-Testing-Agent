@@ -3,6 +3,7 @@ const PlaywrightTestService = require('./playwright');
 const { getDatabase } = require('../database/init');
 const fs = require('fs');
 const path = require('path');
+const { getOptimizedImageBase64, cleanupResizedImage } = require('../utils/imageUtils');
 
 class OpenAIService {
     constructor(userApiKey = null) {
@@ -431,10 +432,13 @@ class OpenAIService {
 
     // Analyze screenshot with GPT-4 Vision
     async analyzeScreenshotWithAI(url, screenshotPath) {
+        let resizedImagePath = null;
         try {
-            // Read screenshot file and convert to base64
-            const imageBuffer = fs.readFileSync(screenshotPath);
-            const base64Image = imageBuffer.toString('base64');
+            // Resize and optimize image for AI analysis to reduce token costs
+            console.log(`🔧 Optimizing screenshot for AI analysis to reduce token costs...`);
+            const imageData = await getOptimizedImageBase64(screenshotPath, 500);
+            const { base64: base64Image, mimeType, resizedPath } = imageData;
+            resizedImagePath = resizedPath;
 
             const response = await fetch(`${this.baseURL}/chat/completions`, {
                 method: 'POST',
@@ -495,7 +499,7 @@ Use specific selectors when possible, or text-based selectors like "text=Button 
                                 {
                                     type: 'image_url',
                                     image_url: {
-                                        url: `data:image/png;base64,${base64Image}`,
+                                        url: `data:${mimeType};base64,${base64Image}`,
                                         detail: 'high'
                                     }
                                 }
@@ -547,6 +551,11 @@ Use specific selectors when possible, or text-based selectors like "text=Button 
                     console.error('Failed to clean up screenshot:', unlinkError);
                 }
                 
+                // Clean up resized image if it was created
+                if (resizedImagePath !== screenshotPath) {
+                    cleanupResizedImage(resizedImagePath);
+                }
+                
                 return result;
             } else {
                 throw new Error('Could not extract JSON from AI response');
@@ -578,6 +587,11 @@ Use specific selectors when possible, or text-based selectors like "text=Button 
                 }
             }
             
+            // Clean up resized image if it was created
+            if (resizedImagePath && resizedImagePath !== screenshotPath) {
+                cleanupResizedImage(resizedImagePath);
+            }
+            
             // Fallback to basic test generation
             const fallbackResult = this.generateBasicTestFromURL(url);
             
@@ -596,32 +610,13 @@ Use specific selectors when possible, or text-based selectors like "text=Button 
 
     // Analyze uploaded image with GPT-4 Vision
     async analyzeUploadedImage(imagePath, originalName) {
+        let resizedImagePath = null;
         try {
-            // Read image file and convert to base64
-            const imageBuffer = fs.readFileSync(imagePath);
-            const base64Image = imageBuffer.toString('base64');
-            
-            // Determine image type from file extension
-            const fileExt = path.extname(originalName).toLowerCase();
-            let mimeType = 'image/png'; // default
-            switch (fileExt) {
-                case '.jpg':
-                case '.jpeg':
-                    mimeType = 'image/jpeg';
-                    break;
-                case '.png':
-                    mimeType = 'image/png';
-                    break;
-                case '.gif':
-                    mimeType = 'image/gif';
-                    break;
-                case '.bmp':
-                    mimeType = 'image/bmp';
-                    break;
-                case '.webp':
-                    mimeType = 'image/webp';
-                    break;
-            }
+            // Resize and optimize image for AI analysis to reduce token costs
+            console.log(`🔧 Optimizing uploaded image for AI analysis to reduce token costs...`);
+            const imageData = await getOptimizedImageBase64(imagePath, 500);
+            const { base64: base64Image, mimeType, resizedPath } = imageData;
+            resizedImagePath = resizedPath;
 
             const response = await fetch(`${this.baseURL}/chat/completions`, {
                 method: 'POST',
@@ -731,6 +726,12 @@ Generate realistic test scenarios that would validate the key functionality visi
                 if (result?.testCase?.actions) {
                     result.testCase.actions = this.normalizeActions(result.testCase.actions);
                 }
+                
+                // Clean up resized image if it was created and different from original
+                if (resizedImagePath !== imagePath) {
+                    cleanupResizedImage(resizedImagePath);
+                }
+                
                 return result;
             } else {
                 throw new Error('Could not extract JSON from AI response');
@@ -751,6 +752,11 @@ Generate realistic test scenarios that would validate the key functionality visi
                 console.warn('Gracefully falling back to basic test generation due to rate limits');
                 usedFallback = true;
                 fallbackReason = 'rate_limit';
+            }
+            
+            // Clean up resized image if it was created and different from original
+            if (resizedImagePath && resizedImagePath !== imagePath) {
+                cleanupResizedImage(resizedImagePath);
             }
             
             // Fallback: Generate basic test case for uploaded image
