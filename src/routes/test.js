@@ -741,8 +741,16 @@ router.post('/ai/parse', authenticateToken, async (req, res) => {
         }
 
         res.json({
-            message: 'Instructions parsed successfully',
-            parsed: { testCase }
+            message: parsed.metadata?.usedFallback 
+                ? `Instructions parsed with fallback due to ${parsed.metadata.fallbackReason === 'quota_exceeded' ? 'API quota limits' : 'rate limits'}. Rule-based parsing used.`
+                : 'Instructions parsed successfully',
+            parsed: { testCase },
+            ...(parsed.metadata?.usedFallback && {
+                warning: parsed.metadata.fallbackReason === 'quota_exceeded' 
+                    ? 'OpenAI API quota exceeded. Consider checking your billing or upgrading your plan for full AI parsing.'
+                    : 'OpenAI API rate limit reached. The system used rule-based fallback parsing.',
+                fallback: 'You can create test cases manually or try again later for AI-powered parsing.'
+            })
         });
 
     } catch (error) {

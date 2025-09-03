@@ -296,13 +296,21 @@ router.post('/image-analysis', authenticateToken, imageUpload.single('image'), a
             }
 
             res.json({
-                message: 'Image analyzed successfully',
+                message: result.metadata?.usedFallback 
+                    ? `Image analyzed with fallback due to ${result.metadata.fallbackReason === 'quota_exceeded' ? 'API quota limits' : 'rate limits'}. Basic test case generated.`
+                    : 'Image analyzed successfully',
                 file: {
                     filename: req.file.filename,
                     originalName: req.file.originalname,
                     size: req.file.size
                 },
-                analysis: result
+                analysis: result,
+                ...(result.metadata?.usedFallback && {
+                    warning: result.metadata.fallbackReason === 'quota_exceeded' 
+                        ? 'OpenAI API quota exceeded. Consider checking your billing or upgrading your plan for full AI analysis.'
+                        : 'OpenAI API rate limit reached. The system used a basic fallback test case.',
+                    fallback: 'You can create more detailed test cases manually or try again later.'
+                })
             });
 
         } catch (analysisError) {
