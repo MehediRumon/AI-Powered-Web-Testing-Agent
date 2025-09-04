@@ -50,7 +50,135 @@ class OpenAIService {
         return sel != null ? String(sel) : '';
     }
 
-    // Normalize actions array: unify locator/selector key and normalize
+    // Enhance AI-generated selectors using system logic
+    enhanceAIGeneratedSelectors(testCase) {
+        if (!testCase || !testCase.actions) {
+            return testCase;
+        }
+
+        const enhancedActions = testCase.actions.map(action => {
+            // Apply selector enhancement for different action types
+            if (action.type === 'select' && action.description) {
+                // Check if this looks like a dropdown instruction
+                const lowerDesc = action.description.toLowerCase();
+                if (this.isDropdownAction(lowerDesc)) {
+                    const enhanced = this.parseSelectInstruction(action.description);
+                    if (enhanced.selector && enhanced.selector !== 'select, [role="combobox"], [role="listbox"]') {
+                        // Generate multi-selector pattern for known dropdown types
+                        action.selector = this.generateMultiSelectorPattern(enhanced.selector, action.description);
+                    }
+                    if (enhanced.value) {
+                        action.value = enhanced.value;
+                    }
+                }
+            } else if (action.type === 'fill' && action.description) {
+                // Enhance input field selectors
+                if (action.selector === 'input' || !action.selector || action.selector.trim() === '') {
+                    const enhanced = this.extractSelector(action.description, 'input');
+                    if (enhanced && enhanced !== 'input' && !enhanced.includes('=')) {
+                        action.selector = enhanced;
+                    } else {
+                        // Generate semantic selector based on description
+                        const lowerDesc = action.description.toLowerCase();
+                        if (lowerDesc.includes('email')) {
+                            action.selector = 'input[type="email"], input[name="email"], #email, #Email';
+                        } else if (lowerDesc.includes('password')) {
+                            action.selector = 'input[type="password"], input[name="password"], #password, #Password';
+                        } else if (lowerDesc.includes('username') || lowerDesc.includes('user name')) {
+                            action.selector = 'input[name="username"], input[name="user"], #username, #userName';
+                        } else if (lowerDesc.includes('name')) {
+                            action.selector = 'input[name="name"], input[name="fullname"], #name, #fullName';
+                        } else {
+                            action.selector = 'input[type="text"], input:not([type]), .form-control';
+                        }
+                    }
+                }
+            } else if (action.type === 'click' && action.description) {
+                // Enhance click selectors
+                if (action.selector === 'button' || !action.selector || action.selector.trim() === '') {
+                    const enhanced = this.extractSelector(action.description, 'button');
+                    if (enhanced && enhanced !== 'button' && enhanced.startsWith('text=')) {
+                        action.selector = enhanced;
+                    } else {
+                        // Generate semantic selector based on description
+                        const lowerDesc = action.description.toLowerCase();
+                        if (lowerDesc.includes('submit')) {
+                            action.selector = 'button[type="submit"], input[type="submit"], text=Submit, .btn-submit';
+                        } else if (lowerDesc.includes('login') || lowerDesc.includes('sign in')) {
+                            action.selector = 'text=Login, text=Sign In, #login, .btn-login';
+                        } else if (lowerDesc.includes('register') || lowerDesc.includes('sign up')) {
+                            action.selector = 'text=Register, text=Sign Up, #register, .btn-register';
+                        } else if (lowerDesc.includes('save')) {
+                            action.selector = 'text=Save, button:contains("Save"), .btn-save';
+                        } else if (lowerDesc.includes('cancel')) {
+                            action.selector = 'text=Cancel, button:contains("Cancel"), .btn-cancel';
+                        } else {
+                            // Extract button text from description
+                            const buttonTextMatch = action.description.match(/click\s+(?:the\s+)?[\"']?([^\"']+)[\"']?\s*(?:button|link)?/i);
+                            if (buttonTextMatch) {
+                                const buttonText = buttonTextMatch[1].trim();
+                                action.selector = `text=${buttonText}, button:contains("${buttonText}"), a:contains("${buttonText}")`;
+                            } else {
+                                action.selector = 'button, input[type="button"], input[type="submit"], .btn';
+                            }
+                        }
+                    }
+                }
+            }
+
+            return action;
+        });
+
+        return {
+            ...testCase,
+            actions: this.normalizeActions(enhancedActions)
+        };
+    }
+
+    // Generate multi-selector pattern for enhanced reliability
+    generateMultiSelectorPattern(primarySelector, description) {
+        // Extract field name from description or selector
+        let fieldName = '';
+        
+        const fieldMatch = description.match(/from\s+(?:the\s+)?(.+?)\s+dropdown/i);
+        if (fieldMatch) {
+            fieldName = fieldMatch[1].trim();
+        } else if (primarySelector.startsWith('#')) {
+            fieldName = primarySelector.slice(1);
+        }
+
+        if (!fieldName) {
+            return primarySelector;
+        }
+
+        const lowerFieldName = fieldName.toLowerCase();
+        
+        // Generate fallback patterns based on field name
+        const fallbackPatterns = [];
+        const cleanName = fieldName.replace(/\s+/g, '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+        const camelCaseName = this.toCamelCase(fieldName);
+        const pascalCaseName = this.toPascalCase(fieldName);
+
+        // Add standard fallback patterns
+        fallbackPatterns.push(`#${cleanName}Type`);
+        fallbackPatterns.push(`select[name="${cleanName}"]`);
+        fallbackPatterns.push(`select[name="${cleanName}Type"]`);
+        
+        // Add camelCase variations
+        if (camelCaseName !== cleanName) {
+            fallbackPatterns.push(`#${camelCaseName}`);
+            fallbackPatterns.push(`#${camelCaseName}Type`);
+        }
+
+        // Add PascalCase variations
+        if (pascalCaseName !== camelCaseName) {
+            fallbackPatterns.push(`#${pascalCaseName}`);
+            fallbackPatterns.push(`#${pascalCaseName}Type`);
+        }
+
+        // Combine primary selector with fallbacks
+        return [primarySelector, ...fallbackPatterns.slice(0, 5)].join(', ');
+    }
     normalizeActions(actions = []) {
         return actions.map(a => {
             if (a.locator && !a.selector) a.selector = a.locator;
@@ -67,6 +195,63 @@ class OpenAIService {
             .filter(Boolean)
             .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
             .join('');
+    }
+
+    // Convert string to camelCase
+    toCamelCase(str) {
+        const pascalCase = this.toPascalCase(str);
+        return pascalCase.charAt(0).toLowerCase() + pascalCase.slice(1);
+    }
+
+    // Generate system-based selector guidance for AI
+    generateSelectorGuidance() {
+        return `
+SELECTOR LEVEL HIERARCHY (Use in order of preference):
+
+Level 1 (Highest Priority) - Unique Identifiers:
+- #elementId (most preferred)
+- [data-testid="value"]
+- [data-cy="value"]
+- [id="elementId"]
+
+Level 2 - Semantic/Structural Selectors:
+- input[type="email"]
+- button[type="submit"]
+- select[name="fieldName"]
+- textarea[name="description"]
+- a[href="/path"]
+
+Level 3 - Class-based Selectors:
+- .btn-primary
+- .form-control
+- .nav-link
+- button.btn-success
+
+Level 4 - Dropdown Multi-Selector Patterns:
+For dropdowns, use our system's multi-selector approach:
+- Primary: #fieldName (e.g., #MobileBankingType, #teachergrade, #religion)
+- Fallback pattern: "#fieldName, #fieldNameType, select[name=fieldName], select[name=fieldNameType]"
+- Examples:
+  * "#teachergrade, #teachergradeType, select[name=teachergrade], select[name=teachergradeType]"
+  * "#religion, #religionType, select[name=religion], select[name=religionType]"
+
+Level 5 - Text-based Selectors (Fallback):
+- text=Button Text
+- text=Link Text
+- [placeholder="Enter email"]
+
+PLACEHOLDER PATTERNS (when specific selectors cannot be determined):
+- Forms: "form input[type='text']", "form input[type='email']", "form select"
+- Buttons: "button:contains('Submit')", "input[type='submit']", ".btn"
+- Links: "a:contains('Login')", "nav a", ".nav-link"
+- Dropdowns: "select", "[role='combobox']", "[role='listbox']"
+
+SYSTEM-SPECIFIC CONVENTIONS:
+1. Use PascalCase for IDs: #MobileBankingType, #TeacherGrade
+2. Prefer descriptive names over generic ones
+3. Include fallback selectors for critical elements
+4. Use semantic HTML attributes when available
+5. Always prefer accessibility attributes (aria-label, role) when present`;
     }
 
     // Parse dropdown/select instructions
@@ -451,14 +636,17 @@ class OpenAIService {
                     messages: [
                         {
                             role: 'system',
-                            content: `You are a web testing expert. Analyze the screenshot of a web page and generate comprehensive test cases based on the visible UI elements. 
+                            content: `You are a web testing expert. Analyze the screenshot of a web page and generate comprehensive test cases based on the visible UI elements, following our system's selector conventions and level-based hierarchy.
 
 Focus on:
-1. Interactive elements (buttons, links, forms, inputs)
+1. Interactive elements (buttons, links, forms, inputs, dropdowns)
 2. Navigation elements
 3. Important content areas
 4. Login/authentication flows if visible
 5. Search functionality if present
+6. Form validation workflows
+
+${this.generateSelectorGuidance()}
 
 Return a JSON object with this exact structure:
 {
@@ -468,8 +656,8 @@ Return a JSON object with this exact structure:
     "url": "${url}",
     "actions": [
       {
-        "type": "click|fill|select|wait|verify",
-        "selector": "CSS selector or text selector",
+        "type": "click|fill|select|wait|verify|assert_visible|assert_text",
+        "selector": "CSS selector following level hierarchy",
         "value": "value for fill/select actions",
         "description": "Human readable description"
       }
@@ -481,13 +669,20 @@ Supported action types:
 - navigate: Navigate to URL
 - click: Click buttons, links, elements  
 - fill: Fill input fields
-- select: Select dropdown options
+- select: Select dropdown options (use multi-selector patterns for dropdowns)
 - wait: Wait for elements or time
 - verify: Verify page content or URL
 - assert_visible: Assert element is visible
 - assert_text: Assert text content
+- hover: Hover over elements
+- scroll: Scroll the page
 
-Use specific selectors when possible, or text-based selectors like "text=Button Text" for clarity.`
+IMPORTANT: 
+- Follow the selector level hierarchy (Level 1-5)
+- Use multi-selector patterns for dropdowns
+- Include placeholder selectors when specific ones cannot be determined
+- Generate realistic test scenarios that validate key functionality
+- Prefer system-specific conventions (PascalCase IDs, semantic selectors)`
                         },
                         {
                             role: 'user',
@@ -542,6 +737,8 @@ Use specific selectors when possible, or text-based selectors like "text=Button 
                 const result = JSON.parse(jsonMatch[0]);
                 if (result?.testCase?.actions) {
                     result.testCase.actions = this.normalizeActions(result.testCase.actions);
+                    // Apply system-based selector enhancement
+                    result.testCase = this.enhanceAIGeneratedSelectors(result.testCase);
                 }
                 
                 // Clean up screenshot file after successful analysis
@@ -629,7 +826,7 @@ Use specific selectors when possible, or text-based selectors like "text=Button 
                     messages: [
                         {
                             role: 'system',
-                            content: `You are a web testing expert. Analyze the uploaded screenshot/image of a web interface and generate comprehensive test cases based on the visible UI elements.
+                            content: `You are a web testing expert. Analyze the uploaded screenshot/image of a web interface and generate comprehensive test cases based on the visible UI elements, following our system's selector conventions and level-based hierarchy.
 
 Focus on:
 1. Interactive elements (buttons, links, forms, inputs, dropdowns)
@@ -640,6 +837,8 @@ Focus on:
 6. Form elements and their validation
 7. Modal dialogs or popups if visible
 
+${this.generateSelectorGuidance()}
+
 Return a JSON object with this exact structure:
 {
   "testCase": {
@@ -649,7 +848,7 @@ Return a JSON object with this exact structure:
     "actions": [
       {
         "type": "click|fill|select|wait|verify|assert_visible|assert_text",
-        "selector": "CSS selector or text selector",
+        "selector": "CSS selector following level hierarchy",
         "value": "value for fill/select actions",
         "description": "Human readable description"
       }
@@ -661,7 +860,7 @@ Supported action types:
 - navigate: Navigate to URL
 - click: Click buttons, links, elements  
 - fill: Fill input fields
-- select: Select dropdown options
+- select: Select dropdown options (use multi-selector patterns for dropdowns)
 - wait: Wait for elements or time
 - verify: Verify page content or URL
 - assert_visible: Assert element is visible
@@ -669,8 +868,12 @@ Supported action types:
 - hover: Hover over elements
 - scroll: Scroll the page
 
-Use specific selectors when possible (CSS selectors like #id, .class, input[type="text"]), or text-based selectors like "text=Button Text" for clarity.
-Generate realistic test scenarios that would validate the key functionality visible in the interface.`
+IMPORTANT:
+- Follow the selector level hierarchy (Level 1-5)
+- Use multi-selector patterns for dropdowns
+- Include placeholder selectors when specific ones cannot be determined
+- Generate realistic test scenarios that validate key functionality
+- Prefer system-specific conventions (PascalCase IDs, semantic selectors)`
                         },
                         {
                             role: 'user',
@@ -725,6 +928,8 @@ Generate realistic test scenarios that would validate the key functionality visi
                 const result = JSON.parse(jsonMatch[0]);
                 if (result?.testCase?.actions) {
                     result.testCase.actions = this.normalizeActions(result.testCase.actions);
+                    // Apply system-based selector enhancement
+                    result.testCase = this.enhanceAIGeneratedSelectors(result.testCase);
                 }
                 
                 // Clean up resized image if it was created and different from original
