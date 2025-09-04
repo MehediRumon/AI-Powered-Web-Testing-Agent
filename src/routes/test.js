@@ -867,15 +867,37 @@ router.post('/ai/generate-from-url', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('AI generation error:', error);
         
+        // Check for specific error types
         if (error.message.includes('API') || error.message.includes('OpenAI')) {
             return res.status(503).json({ 
                 error: 'AI service temporarily unavailable. Please check your OpenAI API configuration and try again later.',
                 fallback: 'You can create test cases manually or use the basic generator.',
                 suggestion: 'Make sure you have OPENAI_API_KEY configured in your .env file or user settings.'
             });
+        } else if (error.message.includes('ERR_NAME_NOT_RESOLVED')) {
+            return res.status(400).json({ 
+                error: 'Unable to access the specified URL. The domain may not exist or be unreachable from this server.',
+                fallback: 'The system generated a comprehensive fallback test case based on the URL structure.',
+                suggestion: 'Please verify the URL is correct and accessible. You can also try creating test cases manually.'
+            });
+        } else if (error.message.includes('net::ERR_') || error.message.includes('timeout')) {
+            return res.status(400).json({ 
+                error: 'Network error accessing the URL. The site may be slow, down, or have connectivity issues.',
+                fallback: 'The system generated a comprehensive fallback test case based on the URL structure.',
+                suggestion: 'Try again later or verify the URL is accessible from your location.'
+            });
+        } else if (error.message.includes('Browser initialization failed')) {
+            return res.status(500).json({ 
+                error: 'Browser initialization failed. This may be due to missing dependencies or environment issues.',
+                fallback: 'The system generated a comprehensive fallback test case based on the URL structure.',
+                suggestion: 'Make sure Playwright browsers are installed: npm run install-browsers'
+            });
         }
         
-        res.status(500).json({ error: 'Failed to generate test case from URL' });
+        res.status(500).json({ 
+            error: 'Failed to generate test case from URL',
+            details: error.message
+        });
     }
 });
 
