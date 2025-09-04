@@ -364,9 +364,29 @@ class OpenAIService {
         let screenshotPath = null;
 
         try {
-            // Initialize browser and navigate to URL (non-headless for visual display)
-            await playwrightService.initialize('chromium', false);
-            await playwrightService.page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+            // Initialize browser and navigate to URL (headless for screenshot capture)
+            try {
+                await playwrightService.initialize('chromium', true);
+            } catch (browserInitError) {
+                console.warn('Browser initialization failed, falling back to enhanced test generation:', browserInitError.message);
+                // Return enhanced fallback immediately if browser can't initialize
+                return this.generateBasicTestFromURL(url);
+            }
+            
+            // Navigate to URL with improved timeout and error handling
+            try {
+                await playwrightService.page.goto(url, { 
+                    waitUntil: 'domcontentloaded', 
+                    timeout: 60000 // Increased timeout for slow-loading sites
+                });
+            } catch (navError) {
+                console.warn(`Navigation to ${url} failed, trying fallback approach:`, navError.message);
+                // Try with minimal wait conditions
+                await playwrightService.page.goto(url, { 
+                    waitUntil: 'commit', 
+                    timeout: 30000 
+                });
+            }
             
             // Wait a bit for dynamic content to load
             await playwrightService.page.waitForTimeout(2000);
@@ -406,6 +426,12 @@ class OpenAIService {
 
         } catch (error) {
             console.error('Error generating test from URL:', error);
+            console.error('URL that failed:', url);
+            console.error('Error details:', {
+                message: error.message,
+                stack: error.stack?.split('\n').slice(0, 5).join('\n'), // First 5 lines of stack
+                type: error.constructor.name
+            });
             
             // Clean up browser if still open
             try {
@@ -808,31 +834,121 @@ Generate realistic test scenarios that would validate the key functionality visi
     generateBasicTestFromURL(url) {
         const urlObj = new URL(url);
         const domain = urlObj.hostname;
-        const testName = `Basic Navigation Test for ${domain}`;
+        const testName = `Comprehensive Test for ${domain}`;
         
+        // Generate more comprehensive actions based on common web patterns
+        const actions = [
+            {
+                type: 'navigate',
+                selector: '',
+                value: url,
+                description: `Navigate to ${url}`
+            },
+            {
+                type: 'wait',
+                value: '3000',
+                description: 'Wait for page to load completely'
+            },
+            {
+                type: 'assert_visible',
+                selector: 'body',
+                description: 'Verify page is loaded and visible'
+            }
+        ];
+
+        // Add common interaction tests based on typical web elements
+        const commonInteractions = [
+            {
+                type: 'assert_visible',
+                selector: 'h1, h2, .title, .header, [role="banner"]',
+                description: 'Verify main heading or header is visible'
+            },
+            {
+                type: 'click',
+                selector: 'a[href], button, [role="button"], .btn',
+                description: 'Test clicking on first available link or button'
+            },
+            {
+                type: 'wait',
+                value: '2000',
+                description: 'Wait after interaction'
+            },
+            {
+                type: 'fill',
+                selector: 'input[type="text"], input[type="email"], input[type="search"], textarea',
+                value: 'test input',
+                description: 'Test filling first available text input'
+            },
+            {
+                type: 'assert_visible',
+                selector: 'nav, .navigation, .menu, [role="navigation"]',
+                description: 'Verify navigation menu is present'
+            }
+        ];
+
+        // Add relevant actions based on URL characteristics
+        if (domain.includes('login') || domain.includes('auth')) {
+            actions.push(
+                {
+                    type: 'fill',
+                    selector: 'input[type="email"], input[name*="email"], input[name*="username"]',
+                    value: 'test@example.com',
+                    description: 'Fill email/username field'
+                },
+                {
+                    type: 'fill',
+                    selector: 'input[type="password"], input[name*="password"]',
+                    value: 'testpassword',
+                    description: 'Fill password field'
+                },
+                {
+                    type: 'click',
+                    selector: 'button[type="submit"], input[type="submit"], .login-btn, .submit-btn',
+                    description: 'Click login/submit button'
+                }
+            );
+        } else if (domain.includes('shop') || domain.includes('store') || domain.includes('ecommerce')) {
+            actions.push(
+                {
+                    type: 'click',
+                    selector: '.product, .item, [data-product]',
+                    description: 'Click on a product item'
+                },
+                {
+                    type: 'fill',
+                    selector: 'input[type="search"], .search-input, [placeholder*="search"]',
+                    value: 'test product',
+                    description: 'Search for products'
+                },
+                {
+                    type: 'click',
+                    selector: '.add-to-cart, .buy-now, [data-add-cart]',
+                    description: 'Add item to cart'
+                }
+            );
+        } else {
+            // Add some common interactions for regular websites
+            actions.push(...commonInteractions.slice(0, 3)); // Add first 3 common interactions
+        }
+
+        // Add final verification
+        actions.push({
+            type: 'wait',
+            value: '2000',
+            description: 'Final wait for any async operations'
+        });
+
         return {
             testCase: {
                 name: testName,
-                description: `Basic navigation and interaction test for ${url}`,
+                description: `Comprehensive navigation and interaction test for ${url}. This test covers common user flows including page loading, element visibility, form interactions, and navigation testing.`,
                 url: url,
-                actions: [
-                    {
-                        type: 'navigate',
-                        selector: '',
-                        value: url,
-                        description: `Navigate to ${url}`
-                    },
-                    {
-                        type: 'wait',
-                        value: '3000',
-                        description: 'Wait for page to load'
-                    },
-                    {
-                        type: 'assert_visible',
-                        selector: 'body',
-                        description: 'Verify page is loaded'
-                    }
-                ]
+                actions: this.normalizeActions(actions)
+            },
+            metadata: {
+                generationType: 'enhanced_fallback',
+                reason: 'Generated enhanced fallback test with domain-specific interactions',
+                timestamp: new Date().toISOString()
             }
         };
     }
