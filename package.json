@@ -10,8 +10,10 @@
     "mcp": "node src/mcp/server.js",
     "test-mcp": "node tests/test-mcp-server.js",
     "test-mcp-comprehensive": "node tests/test-mcp-comprehensive.js",
+    "test-mcp-integration": "node tests/test-mcp-integration.js",
+    "validate-mcp": "node scripts/validate-mcp.js",
     "install-browsers": "npx playwright install",
-    "setup": "npm run setup-env && npm install && npm run install-browsers",
+    "setup": "npm run setup-env && npm install && npm run install-browsers && npm run validate-mcp",
     "setup-env": "node -e \"const fs = require('fs'); if (!fs.existsSync('.env')) { fs.copyFileSync('.env.example', '.env'); console.log('✅ Created .env file from template'); } else { console.log('ℹ️ .env file already exists'); }\"",
     "check-conflicts": "node scripts/check-conflicts.js",
     "prestart": "npm run check-conflicts"
