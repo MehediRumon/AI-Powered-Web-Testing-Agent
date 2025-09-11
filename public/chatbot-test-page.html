@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BrightTech Solutions - Chatbot Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .chat-container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+            height: 500px;
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-header {
+            background: #667eea;
+            color: white;
+            padding: 15px;
+            font-weight: bold;
+        }
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .message {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            word-wrap: break-word;
+        }
+        .user-message {
+            background: #e3f2fd;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+        .bot-message {
+            background: #f5f5f5;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+        .chat-input-container {
+            padding: 20px;
+            border-top: 1px solid #eee;
+            display: flex;
+            gap: 10px;
+        }
+        .chat-input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            outline: none;
+        }
+        .send-button {
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 12px 20px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .send-button:hover {
+            background: #5a6fd8;
+        }
+        .problem-indicator {
+            background: #ffebee;
+            border: 1px solid #ffcdd2;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            color: #c62828;
+            font-size: 14px;
+        }
+        .fix-indicator {
+            background: #e8f5e8;
+            border: 1px solid #c8e6c9;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            color: #2e7d32;
+            font-size: 14px;
+        }
+        .debug-panel {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .debug-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #495057;
+        }
+        .debug-content {
+            font-family: monospace;
+            font-size: 12px;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+        }
+        .toggle-button {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        .toggle-button:hover {
+            background: #218838;
+        }
+        .toggle-button.inactive {
+            background: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏢 BrightTech Solutions</h1>
+            <p>AI-Powered Software Development & Chatbot Services</p>
+        </div>
+
+        <div class="debug-panel">
+            <div class="debug-title">🐛 Language Processing Mode</div>
+            <button id="buggyModeBtn" class="toggle-button" onclick="toggleMode('buggy')">Buggy Mode (Current Issue)</button>
+            <button id="fixedModeBtn" class="toggle-button inactive" onclick="toggleMode('fixed')">Fixed Mode (With Solution)</button>
+            <p id="modeDescription">Currently demonstrating the Bengali language parsing issue</p>
+        </div>
+
+        <div class="chat-container">
+            <div class="chat-header">
+                🤖 BrightTech Support Assistant
+            </div>
+            <div class="chat-messages" id="chatMessages">
+                <div class="message bot-message">
+                    Hello! How can I assist you today with BrightTech Solutions services?
+                </div>
+            </div>
+            <div class="chat-input-container">
+                <input type="text" id="chatInput" class="chat-input" placeholder="Type your message... (Try: 'ki product available ase?')" onkeypress="handleKeyPress(event)">
+                <button class="send-button" onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+
+        <div class="debug-panel">
+            <div class="debug-title">🔍 Language Processing Debug</div>
+            <div class="debug-content" id="debugOutput">
+                Ready to analyze user input...
+            </div>
+        </div>
+
+        <div class="debug-panel">
+            <div class="debug-title">📋 Test Scenarios</div>
+            <p><strong>Try these Bengali phrases to see the issue:</strong></p>
+            <ul>
+                <li><button onclick="sendTestMessage('order korte chai')">order korte chai</button> (I want to place an order)</li>
+                <li><button onclick="sendTestMessage('ki product available ase?')">ki product available ase?</button> (What products are available?)</li>
+                <li><button onclick="sendTestMessage('ki ki service ase?')">ki ki service ase?</button> (What services are there?)</li>
+                <li><button onclick="sendTestMessage('price koto ase?')">price koto ase?</button> (What's the price?)</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        let currentMode = 'buggy'; // Start with the buggy implementation
+
+        // Product catalog
+        const products = [
+            { name: 'Web Application Development', category: 'software', price: '$5000-$50000' },
+            { name: 'Mobile App Development', category: 'software', price: '$3000-$30000' },
+            { name: 'AI-Powered Chatbot', category: 'ai', price: '$2000-$15000' },
+            { name: 'Database Design & Implementation', category: 'database', price: '$1000-$10000' },
+            { name: 'Cloud Infrastructure Setup', category: 'cloud', price: '$2000-$20000' },
+            { name: 'API Development & Integration', category: 'api', price: '$1500-$12000' }
+        ];
+
+        function toggleMode(mode) {
+            currentMode = mode;
+            const buggyBtn = document.getElementById('buggyModeBtn');
+            const fixedBtn = document.getElementById('fixedModeBtn');
+            const modeDesc = document.getElementById('modeDescription');
+
+            if (mode === 'buggy') {
+                buggyBtn.classList.remove('inactive');
+                fixedBtn.classList.add('inactive');
+                modeDesc.textContent = 'Currently demonstrating the Bengali language parsing issue';
+            } else {
+                buggyBtn.classList.add('inactive');
+                fixedBtn.classList.remove('inactive');
+                modeDesc.textContent = 'Currently using the fixed Bengali language processing';
+            }
+
+            updateDebugOutput('Mode switched to: ' + mode);
+        }
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        }
+
+        function sendTestMessage(message) {
+            document.getElementById('chatInput').value = message;
+            sendMessage();
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+
+            // Add user message to chat
+            addMessage(message, 'user');
+            
+            // Clear input
+            input.value = '';
+
+            // Process message and generate response
+            setTimeout(() => {
+                const response = processMessage(message);
+                addMessage(response.text, 'bot');
+                updateDebugOutput(response.debug);
+            }, 500);
+        }
+
+        function addMessage(text, sender) {
+            const messagesContainer = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}-message`;
+            messageDiv.textContent = text;
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function updateDebugOutput(debugInfo) {
+            document.getElementById('debugOutput').textContent = debugInfo;
+        }
+
+        function processMessage(message) {
+            const lowerMessage = message.toLowerCase().trim();
+            
+            if (currentMode === 'buggy') {
+                return processBuggyMode(message, lowerMessage);
+            } else {
+                return processFixedMode(message, lowerMessage);
+            }
+        }
+
+        // BUGGY IMPLEMENTATION - Demonstrates the problem
+        function processBuggyMode(originalMessage, lowerMessage) {
+            let debugInfo = `BUGGY MODE - Processing: "${originalMessage}"\n`;
+            debugInfo += `Lowercased: "${lowerMessage}"\n`;
+
+            // Simple pattern matching that causes the issue
+            if (lowerMessage.includes('order') && lowerMessage.includes('korte')) {
+                debugInfo += 'Pattern: order + korte -> showing services info\n';
+                return {
+                    text: "Apologies, it seems there might be a misunderstanding. BrightTech Solutions specializes in software development, including web applications, mobile apps, and AI-powered chatbots. If you'd like to place an order or inquire about our services, please visit our website at brighttechsolutions.com or contact us at +1 (415) 987-6543 or mrumon569@gmail.com for assistance. How can I help you further?",
+                    debug: debugInfo
+                };
+            }
+
+            if (lowerMessage.includes('hello') || lowerMessage.includes('hi')) {
+                debugInfo += 'Pattern: greeting detected\n';
+                return {
+                    text: "Hello! How can I assist you today?",
+                    debug: debugInfo
+                };
+            }
+
+            // THIS IS THE BUGGY PART - incorrectly extracts "ase?" as search term
+            const questionWords = ['ki', 'what', 'product', 'service', 'available'];
+            let hasQuestionWord = false;
+            for (const word of questionWords) {
+                if (lowerMessage.includes(word)) {
+                    hasQuestionWord = true;
+                    break;
+                }
+            }
+
+            if (hasQuestionWord) {
+                // WRONG: Extract "ase?" as search term instead of understanding the full question
+                const words = lowerMessage.split(/\s+/);
+                let searchTerm = '';
+                
+                // Buggy logic: looks for "ase" and treats it as search term
+                for (let i = 0; i < words.length; i++) {
+                    if (words[i].includes('ase')) {
+                        searchTerm = words[i];
+                        break;
+                    }
+                }
+
+                debugInfo += `BUGGY LOGIC: Extracted search term: "${searchTerm}"\n`;
+                debugInfo += 'Instead of understanding this as "what products are available?"\n';
+
+                if (searchTerm) {
+                    return {
+                        text: `'${searchTerm}' এর সাথে মিলে এমন কোনো পণ্য পাওয়া যায়নি। অনুগ্রহ করে অন্য কোনো শব্দ দিয়ে খুঁজুন।`,
+                        debug: debugInfo
+                    };
+                }
+            }
+
+            debugInfo += 'No pattern matched - generic response\n';
+            return {
+                text: "I'm not sure I understand. Can you please rephrase your question?",
+                debug: debugInfo
+            };
+        }
+
+        // FIXED IMPLEMENTATION - Proper Bengali language processing
+        function processFixedMode(originalMessage, lowerMessage) {
+            let debugInfo = `FIXED MODE - Processing: "${originalMessage}"\n`;
+            debugInfo += `Lowercased: "${lowerMessage}"\n`;
+
+            // Proper Bengali question pattern recognition
+            const bengaliQuestionPatterns = [
+                {
+                    pattern: /ki.*product.*available.*ase/i,
+                    intent: 'list_products',
+                    description: 'User asking "what products are available?"'
+                },
+                {
+                    pattern: /ki.*ki.*service.*ase/i,
+                    intent: 'list_services', 
+                    description: 'User asking "what services are there?"'
+                },
+                {
+                    pattern: /price.*koto.*ase/i,
+                    intent: 'pricing_info',
+                    description: 'User asking about pricing'
+                },
+                {
+                    pattern: /order.*korte.*chai/i,
+                    intent: 'place_order',
+                    description: 'User wants to place an order'
+                }
+            ];
+
+            // Check for Bengali question patterns
+            for (const patternObj of bengaliQuestionPatterns) {
+                if (patternObj.pattern.test(lowerMessage)) {
+                    debugInfo += `✅ MATCHED PATTERN: ${patternObj.description}\n`;
+                    debugInfo += `Intent: ${patternObj.intent}\n`;
+                    
+                    return {
+                        text: generateResponseForIntent(patternObj.intent),
+                        debug: debugInfo
+                    };
+                }
+            }
+
+            // Handle other basic patterns
+            if (lowerMessage.includes('hello') || lowerMessage.includes('hi')) {
+                debugInfo += 'Pattern: greeting detected\n';
+                return {
+                    text: "Hello! How can I assist you today?",
+                    debug: debugInfo
+                };
+            }
+
+            debugInfo += 'No specific pattern matched - generic helpful response\n';
+            return {
+                text: "I understand you're asking about our services. Here's what BrightTech Solutions offers: Web Applications, Mobile Apps, AI-Powered Chatbots, Database Systems, Cloud Infrastructure, and API Development. Which service interests you?",
+                debug: debugInfo
+            };
+        }
+
+        function generateResponseForIntent(intent) {
+            switch (intent) {
+                case 'list_products':
+                    return `আমাদের পণ্য ও সেবাসমূহ:\n\n${products.map(p => `• ${p.name} (${p.price})`).join('\n')}\n\nআরো জানতে আমাদের ওয়েবসাইট brighttechsolutions.com ভিজিট করুন বা +1 (415) 987-6543 নম্বরে যোগাযোগ করুন।`;
+                    
+                case 'list_services':
+                    return `আমাদের সেবাসমূহ:\n• Software Development\n• Web Applications\n• Mobile Apps\n• AI-Powered Chatbots\n• Database Design\n• Cloud Infrastructure\n• API Development\n\nকোন সেবায় আপনার আগ্রহ?`;
+                    
+                case 'pricing_info':
+                    return `আমাদের সেবার মূল্য প্রকল্পের উপর নির্ভর করে:\n• Web Apps: $5,000-$50,000\n• Mobile Apps: $3,000-$30,000\n• AI Chatbots: $2,000-$15,000\n• Database: $1,000-$10,000\n• Cloud Setup: $2,000-$20,000\n• API Development: $1,500-$12,000\n\nবিস্তারিত জানতে যোগাযোগ করুন।`;
+                    
+                case 'place_order':
+                    return "আমাদের সেবা অর্ডার করতে চান? চমৎকার! অনুগ্রহ করে আমাদের ওয়েবসাইট brighttechsolutions.com ভিজিট করুন অথবা mrumon569@gmail.com এ ইমেইল করুন। আপনি +1 (415) 987-6543 নম্বরেও কল করতে পারেন। কোন ধরনের সফটওয়্যার ডেভেলপমেন্ট সেবায় আপনার আগ্রহ?";
+                    
+                default:
+                    return "আমি আপনাকে সাহায্য করতে চাই। আমাদের সেবা সম্পর্কে আরো জানতে চাইলে অনুগ্রহ করে brighttechsolutions.com ভিজিট করুন।";
+            }
+        }
+
+        // Initialize debug output
+        updateDebugOutput('Chatbot initialized in buggy mode. Try typing "ki product available ase?" to see the issue.');
+    </script>
+</body>
+</html>

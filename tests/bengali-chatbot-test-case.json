@@ -1,0 +1,86 @@
+{
+  "name": "Bengali Chatbot Language Processing Fix Validation",
+  "description": "Tests the fix for Bengali language parsing issue where 'ki product available ase?' was incorrectly parsed as search for 'ase?'",
+  "url": "http://localhost:3000/chatbot-test-page.html",
+  "actions": [
+    {
+      "type": "navigate",
+      "value": "http://localhost:3000/chatbot-test-page.html",
+      "description": "Navigate to Bengali chatbot test page"
+    },
+    {
+      "type": "wait",
+      "value": "3000",
+      "description": "Wait for page to fully load"
+    },
+    {
+      "type": "click",
+      "selector": "#buggyModeBtn",
+      "description": "Ensure buggy mode is active to demonstrate the issue"
+    },
+    {
+      "type": "wait",
+      "value": "500",
+      "description": "Wait for mode switch"
+    },
+    {
+      "type": "fill",
+      "selector": "#chatInput",
+      "value": "ki product available ase?",
+      "description": "Type problematic Bengali question"
+    },
+    {
+      "type": "click",
+      "selector": ".send-button",
+      "description": "Send the Bengali question"
+    },
+    {
+      "type": "wait",
+      "value": "2000",
+      "description": "Wait for chatbot response"
+    },
+    {
+      "type": "assert_text",
+      "selector": ".chat-messages .bot-message:last-child",
+      "value": "'ase?' এর সাথে মিলে এমন কোনো পণ্য পাওয়া যায়নি",
+      "description": "Verify buggy response demonstrates the parsing issue"
+    },
+    {
+      "type": "click",
+      "selector": "#fixedModeBtn",
+      "description": "Switch to fixed mode to test the solution"
+    },
+    {
+      "type": "wait",
+      "value": "500",
+      "description": "Wait for mode switch"
+    },
+    {
+      "type": "fill",
+      "selector": "#chatInput",
+      "value": "ki product available ase?",
+      "description": "Type the same Bengali question in fixed mode"
+    },
+    {
+      "type": "click",
+      "selector": ".send-button",
+      "description": "Send the Bengali question in fixed mode"
+    },
+    {
+      "type": "wait",
+      "value": "2000",
+      "description": "Wait for improved chatbot response"
+    },
+    {
+      "type": "assert_text",
+      "selector": ".chat-messages .bot-message:last-child",
+      "value": "আমাদের পণ্য ও সেবাসমূহ",
+      "description": "Verify fixed response correctly lists products"
+    },
+    {
+      "type": "wait",
+      "value": "1000",
+      "description": "Final wait for completion"
+    }
+  ]
+}
