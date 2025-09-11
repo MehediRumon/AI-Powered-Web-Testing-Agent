@@ -239,6 +239,50 @@ Create files with these columns:
 - **File Processing**: Multer, XLSX, CSV-parser
 - **Reports**: HTML/PDF generation
 - **Frontend**: Vanilla HTML/CSS/JavaScript
+- **MCP Server**: Model Context Protocol server for AI assistant integration
+
+## MCP Server Integration
+
+The AI-Powered Web Testing Agent includes a Model Context Protocol (MCP) server that enables AI assistants to programmatically create and execute web tests.
+
+### Starting the MCP Server
+
+```bash
+# Start MCP server
+npm run mcp
+
+# Test MCP server functionality
+npm run test-mcp
+```
+
+### Available MCP Tools
+
+- `create_test_case` - Create new test cases
+- `parse_natural_language` - Convert descriptions to test actions
+- `execute_test_case` - Run specific tests
+- `list_test_cases` - View all test cases
+- `get_test_results` - Retrieve test results
+- `get_browser_status` - Check browser installation
+- `create_test_from_description` - Create complete tests from natural language
+- `delete_test_case` - Remove test cases
+
+### AI Assistant Integration
+
+Configure your AI assistant (like Claude Desktop) to use the MCP server:
+
+```json
+{
+  "mcpServers": {
+    "ai-web-testing-agent": {
+      "command": "node",
+      "args": ["src/mcp/server.js"],
+      "cwd": "/path/to/project"
+    }
+  }
+}
+```
+
+See `src/mcp/README.md` and `src/mcp/examples.md` for detailed documentation and usage examples.
 
 ## Troubleshooting
 
