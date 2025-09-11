@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "ai-web-testing-agent": {
+      "command": "node",
+      "args": ["src/mcp/server.js"],
+      "cwd": "/home/runner/work/AI-Powered-Web-Testing-Agent/AI-Powered-Web-Testing-Agent",
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
+}
