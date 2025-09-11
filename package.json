@@ -9,7 +9,9 @@
     "test": "node tests/test.js",
     "install-browsers": "npx playwright install",
     "setup": "npm run setup-env && npm install && npm run install-browsers",
-    "setup-env": "node -e \"const fs = require('fs'); if (!fs.existsSync('.env')) { fs.copyFileSync('.env.example', '.env'); console.log('✅ Created .env file from template'); } else { console.log('ℹ️ .env file already exists'); }\""
+    "setup-env": "node -e \"const fs = require('fs'); if (!fs.existsSync('.env')) { fs.copyFileSync('.env.example', '.env'); console.log('✅ Created .env file from template'); } else { console.log('ℹ️ .env file already exists'); }\"",
+    "check-conflicts": "node scripts/check-conflicts.js",
+    "prestart": "npm run check-conflicts"
   },
   "keywords": [
     "web-testing",
