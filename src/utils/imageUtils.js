@@ -84,6 +84,14 @@ async function resizeImageForAI(inputPath, outputPath = null, maxDimension = 500
 /**
  * Get optimized base64 representation of an image for AI analysis
  * Resizes the image if needed and converts to base64
+ * 
+ * Token Optimization Strategy:
+ * - Resizes images to maxDimension (default 500px) to reduce file size
+ * - Combined with 'detail: low' in vision API calls for maximum token savings
+ * - 'detail: low' uses only 85 tokens regardless of image size
+ * - 'detail: high' would use 170+ tokens based on image dimensions
+ * - This combination can reduce token usage by 90%+ while maintaining analysis quality
+ * 
  * @param {string} imagePath - Path to the image file
  * @param {number} maxDimension - Maximum dimension for width or height (default: 500)
  * @returns {Promise<{base64: string, mimeType: string, resizedPath: string}>}
